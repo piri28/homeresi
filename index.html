@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>homeresi — NYC Tenant Reviews</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Firebase SDKs (modular, CDN compat build) -->
+<script type="module">
+  // ─── FIREBASE INIT ────────────────────────────────────────────────────────
+  import { initializeApp }                        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAnalytics }                         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+  import {
+    getFirestore, collection, doc,
+    setDoc, updateDoc, getDocs, onSnapshot,
+    arrayUnion, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
+    authDomain:        "homeresi.firebaseapp.com",
+    projectId:         "homeresi",
+    storageBucket:     "homeresi.firebasestorage.app",
+    messagingSenderId: "1044254777018",
+    appId:             "1:1044254777018:web:f01ebcffc70401b705ac83",
+    measurementId:     "G-VPQCCNTQZ7"
+  };
+
+  const app       = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const db        = getFirestore(app);
+  const BUILDINGS = collection(db, "buildings");
+
+  // ─── IN-MEMORY CACHE (mirrors Firestore, keeps UI reactive) ───────────────
+  const cache = {};   // { [id]: buildingObj }
+
+  // ─── MAP SETUP ─────────────────────────────────────────────────────────────
+  const map = L.map('map', { center: [40.7128, -74.0060], zoom: 13, zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 19,
+  }).addTo(map);
+
+  const leafletMarkers = {};
+
+  function avgRating(building) {
+    if (!building.reviews || !building.reviews.length) return 0;
+    return building.reviews.reduce((s, r) => s + r.rating, 0) / building.reviews.length;
+  }
+
+  function ratingColor(avg) {
+    if (avg >= 4)   return '#2d7a4f';
+    if (avg >= 2.5) return '#e8a020';
+    return '#c93030';
+  }
+
+  function starStr(rating) {
+    let s = '';
+    for (let i = 1; i <= 5; i++) s += i <= rating ? '★' : '☆';
+    return s;
+  }
+
+  function createMarkerIcon(building) {
+    const avg   = avgRating(building);
+    const color = building.reviews && building.reviews.length ? ratingColor(avg) : '#e8a020';
+    const label = building.reviews && building.reviews.length ? avg.toFixed(1) : '+';
+    return L.divIcon({
+      className: '',
+      html: `<div style="
+        width:38px;height:38px;background:${color};
+        border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+        border:3px solid #0f0e0d;display:flex;align-items:center;
+        justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.5);cursor:pointer;">
+        <span style="transform:rotate(45deg);font-size:11px;font-weight:800;
+          color:#0f0e0d;font-family:'Syne',sans-serif;line-height:1;">${label}</span>
+      </div>`,
+      iconSize: [38, 38], iconAnchor: [19, 38], popupAnchor: [0, -38],
+    });
+  }
+
+  function placeLeafletMarker(building) {
+    // Remove existing marker if present (refresh)
+    if (leafletMarkers[building.id]) {
+      map.removeLayer(leafletMarkers[building.id]);
+    }
+    const marker = L.marker([building.lat, building.lng], {
+      icon: createMarkerIcon(building),
+    }).addTo(map);
+
+    const avg       = avgRating(building);
+    const revCount  = building.reviews ? building.reviews.length : 0;
+    const ratingTxt = revCount
+      ? `${starStr(Math.round(avg))} <strong>${avg.toFixed(1)}</strong> (${revCount} review${revCount !== 1 ? 's' : ''})`
+      : 'No reviews yet';
+
+    marker.bindPopup(`
+      <div class="popup-addr">${building.name || building.address.split(',')[0]}</div>
+      <div style="font-size:0.72rem;color:#7a7570;margin-bottom:4px;">${building.address}</div>
+      <div class="popup-rating">${ratingTxt}</div>
+      <button class="popup-btn" onclick="window._openPanel('${building.id}')">Read Reviews →</button>
+    `);
+
+    marker.on('click', () => openPanel(building.id));
+    leafletMarkers[building.id] = marker;
+  }
+
+  // ─── FIRESTORE: REAL-TIME LISTENER (load + live updates) ──────────────────
+  function initFirestoreListener() {
+    onSnapshot(BUILDINGS, (snapshot) => {
+      snapshot.docChanges().forEach(change => {
+        const data = { id: change.doc.id, ...change.doc.data() };
+        // Normalise: Firestore stores reviews as array field
+        if (!data.reviews) data.reviews = [];
+
+        if (change.type === 'added' || change.type === 'modified') {
+          cache[data.id] = data;
+          placeLeafletMarker(data);
+        }
+        if (change.type === 'removed') {
+          delete cache[data.id];
+          if (leafletMarkers[data.id]) {
+            map.removeLayer(leafletMarkers[data.id]);
+            delete leafletMarkers[data.id];
+          }
+        }
+      });
+      updateStats();
+    }, (err) => {
+      console.error('Firestore snapshot error:', err);
+      showToast('Could not connect to database', true);
+    });
+  }
+
+  // ─── FIRESTORE: SAVE NEW BUILDING ──────────────────────────────────────────
+  async function saveNewBuilding(building) {
+    const ref = doc(BUILDINGS, building.id);
+    await setDoc(ref, {
+      lat:      building.lat,
+      lng:      building.lng,
+      address:  building.address,
+      name:     building.name,
+      reviews:  building.reviews,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  // ─── FIRESTORE: ADD REVIEW TO EXISTING BUILDING ───────────────────────────
+  async function addReviewToBuilding(buildingId, review) {
+    const ref = doc(BUILDINGS, buildingId);
+    await updateDoc(ref, {
+      reviews: arrayUnion(review),
+    });
+  }
+
+  // ─── MAP: init listener once map is ready ─────────────────────────────────
+  initFirestoreListener();
+
+  // ─── MAP CLICK: add new building ───────────────────────────────────────────
+  let tempMarker    = null;
+  let pendingLat    = null;
+  let pendingLng    = null;
+
+  map.on('click', async (e) => {
+    const { lat, lng } = e.latlng;
+    pendingLat = lat;
+    pendingLng = lng;
+
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([lat, lng], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="width:20px;height:20px;background:#f5c84a;border-radius:50%;
+          border:3px solid #0f0e0d;animation:pulse2 1s infinite;"></div>
+          <style>@keyframes pulse2{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:0.6}}</style>`,
+        iconSize: [20, 20], iconAnchor: [10, 10],
+      })
+    }).addTo(map);
+
+    const address = await reverseGeocode(lat, lng);
+    openNewBuildingPanel(lat, lng, address);
+  });
+
+  async function reverseGeocode(lat, lng) {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+      const data = await resp.json();
+      return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    } catch {
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+  }
+
+  // ─── SEARCH ────────────────────────────────────────────────────────────────
+  const searchInput   = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  let searchTimer;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 3) { searchResults.classList.remove('show'); return; }
+    searchTimer = setTimeout(() => doSearch(q), 400);
+  });
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape') searchResults.classList.remove('show');
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap')) searchResults.classList.remove('show');
+  });
+
+  async function doSearch(q) {
+    q = q || searchInput.value.trim();
+    if (!q) return;
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ' New York City')}&limit=5&addressdetails=1`);
+      const results = await resp.json();
+      if (!results.length) {
+        searchResults.innerHTML = '<div class="search-result-item"><div class="addr-main" style="color:#7a7570">No results found</div></div>';
+      } else {
+        searchResults.innerHTML = results.map(r => `
+          <div class="search-result-item" onclick="window._goToLocation(${r.lat}, ${r.lon}, '${escHtml(r.display_name)}')">
+            <div class="addr-main">${r.display_name.split(',')[0]}</div>
+            <div class="addr-sub">${r.display_name.split(',').slice(1,3).join(',')}</div>
+          </div>`).join('');
+      }
+      searchResults.classList.add('show');
+    } catch {}
+  }
+
+  // expose to inline onclick
+  window._goToLocation = (lat, lng, addr) => {
+    map.flyTo([lat, lng], 17, { duration: 1.2 });
+    searchResults.classList.remove('show');
+    searchInput.value = addr.split(',')[0];
+  };
+
+  function escHtml(str) {
+    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  }
+
+  // ─── PANEL ─────────────────────────────────────────────────────────────────
+  const sidePanel  = document.getElementById('side-panel');
+  const panelInner = document.getElementById('panel-inner');
+  let currentBuildingId = null;
+  const selectedRating  = {};
+
+  function openPanel(buildingId) {
+    currentBuildingId = buildingId;
+    const building = cache[buildingId];
+    if (!building) return;
+    sidePanel.classList.add('open');
+    renderPanel(building);
+    map.flyTo([building.lat, building.lng], Math.max(map.getZoom(), 15), { duration: 0.8 });
+    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+  }
+  // expose for popup buttons
+  window._openPanel = openPanel;
+
+  function openNewBuildingPanel(lat, lng, address) {
+    sidePanel.classList.add('open');
+    panelInner.innerHTML = `
+      <div class="building-header">
+        <button class="close-btn" onclick="window._closePanel()">✕</button>
+        <div class="building-tag">📍 New Building</div>
+        <div class="building-name">${address.split(',')[0]}</div>
+        <div class="building-addr">${address.split(',').slice(1,3).join(',')}</div>
+      </div>
+      <div class="write-review">
+        <div class="section-title">Be the first to review</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;">Drop your honest experience for future tenants.</div>
+        <div class="star-picker" id="star-picker-new">
+          ${[1,2,3,4,5].map(i=>`<button class="star-btn" data-val="${i}" onclick="window._setRating(this,'new')">★</button>`).join('')}
+        </div>
+        <div class="review-fields">
+          <input type="text" id="reviewer-name-new" placeholder="Your name (e.g. J. Smith)">
+          <textarea id="reviewer-text-new" placeholder="Share your experience as a tenant…"></textarea>
+          <button class="submit-btn" id="submit-new-btn">Add Building & Review</button>
+        </div>
+      </div>`;
+    document.getElementById('submit-new-btn').addEventListener('click', () => submitNewBuilding(lat, lng, address));
+  }
+
+  window._setRating = (btn, id) => {
+    const val = parseInt(btn.dataset.val);
+    selectedRating[id] = val;
+    const picker = btn.closest('.star-picker');
+    picker.querySelectorAll('.star-btn').forEach((b, i) => {
+      b.classList.toggle('active', i < val);
+    });
+  };
+
+  async function submitNewBuilding(lat, lng, address) {
+    const rating = selectedRating['new'] || 0;
+    const name   = document.getElementById('reviewer-name-new').value.trim() || 'Anonymous';
+    const text   = document.getElementById('reviewer-text-new').value.trim();
+    if (!rating) { showToast('Please select a star rating', true); return; }
+    if (!text)   { showToast('Please write a review', true);       return; }
+
+    const id       = 'b' + Date.now();
+    const review   = { author: name, rating, text, date: new Date().toISOString().slice(0, 10) };
+    const building = {
+      id, lat, lng,
+      address,
+      name: address.split(',')[0],
+      reviews: [review],
+    };
+
+    const btn = document.getElementById('submit-new-btn');
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+
+    try {
+      await saveNewBuilding(building);
+      delete selectedRating['new'];
+      if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+      showToast('Building added & review posted! ✓');
+      // onSnapshot will update cache + marker automatically
+      openPanel(id);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save — check Firestore rules', true);
+      btn.textContent = 'Add Building & Review';
+      btn.disabled = false;
+    }
+  }
+
+  function renderPanel(building) {
+    const avg         = avgRating(building);
+    const reviewCount = building.reviews ? building.reviews.length : 0;
+    const dist        = [0,0,0,0,0];
+    if (building.reviews) {
+      building.reviews.forEach(r => { if (r.rating >= 1 && r.rating <= 5) dist[r.rating-1]++; });
+    }
+
+    panelInner.innerHTML = `
+      <div class="building-header">
+        <button class="close-btn" onclick="window._closePanel()">✕</button>
+        <div class="building-tag">🏢 Tenant Reviews</div>
+        <div class="building-name">${building.name || building.address.split(',')[0]}</div>
+        <div class="building-addr">${building.address}</div>
+        ${reviewCount ? `
+        <div class="rating-summary">
+          <div class="rating-big ${avg>=4?'badge-good':avg>=2.5?'badge-mid':'badge-bad'}">${avg.toFixed(1)}</div>
+          <div class="rating-info">
+            <div class="stars-display">
+              ${[1,2,3,4,5].map(i=>`<span class="star-icon ${i<=Math.round(avg)?'filled':'empty'}">★</span>`).join('')}
+            </div>
+            <div class="review-count">${reviewCount} review${reviewCount!==1?'s':''}</div>
+          </div>
+        </div>` : ''}
+      </div>
+
+      ${reviewCount ? `
+      <div class="rating-bars">
+        ${[5,4,3,2,1].map(star => `
+          <div class="rating-bar-row">
+            <span class="label">${star}</span>
+            <span class="star-sm">★</span>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${reviewCount?(dist[star-1]/reviewCount*100):0}%"></div>
+            </div>
+            <span class="bar-count">${dist[star-1]}</span>
+          </div>`).join('')}
+      </div>` : ''}
+
+      <div class="write-review">
+        <div class="section-title">Write a Review</div>
+        <div class="star-picker" id="star-picker-${building.id}">
+          ${[1,2,3,4,5].map(i=>`<button class="star-btn" data-val="${i}" onclick="window._setRating(this,'${building.id}')">★</button>`).join('')}
+        </div>
+        <div class="review-fields">
+          <input type="text" id="reviewer-name-${building.id}" placeholder="Your name (e.g. J. Smith)">
+          <textarea id="reviewer-text-${building.id}" placeholder="Share your experience as a tenant…"></textarea>
+          <button class="submit-btn" id="submit-review-btn-${building.id}">Post Review</button>
+        </div>
+      </div>
+
+      <div class="reviews-list">
+        <div class="section-title">${reviewCount ? `All Reviews (${reviewCount})` : 'No reviews yet'}</div>
+        ${reviewCount ? building.reviews.slice().reverse().map(r => `
+          <div class="review-card">
+            <div class="review-card-header">
+              <div class="reviewer-info">
+                <div class="reviewer-name">${r.author}</div>
+                <div class="review-meta">${formatDate(r.date)}</div>
+              </div>
+              <div class="review-stars">
+                ${[1,2,3,4,5].map(i=>`<span class="s ${i<=r.rating?'f':'e'}">★</span>`).join('')}
+              </div>
+            </div>
+            <div class="review-body">${r.text}</div>
+          </div>`).join('') :
+          `<div class="no-reviews"><span class="icon">✍️</span>Be the first to review this building.</div>`}
+      </div>`;
+
+    document.getElementById(`submit-review-btn-${building.id}`)
+      .addEventListener('click', () => submitReview(building.id));
+  }
+
+  async function submitReview(buildingId) {
+    const rating = selectedRating[buildingId] || 0;
+    const name   = document.getElementById(`reviewer-name-${buildingId}`).value.trim() || 'Anonymous';
+    const text   = document.getElementById(`reviewer-text-${buildingId}`).value.trim();
+    if (!rating) { showToast('Please select a star rating', true); return; }
+    if (!text)   { showToast('Please write a review', true);       return; }
+
+    const review = { author: name, rating, text, date: new Date().toISOString().slice(0, 10) };
+    const btn    = document.getElementById(`submit-review-btn-${buildingId}`);
+    btn.textContent = 'Saving…';
+    btn.disabled    = true;
+
+    try {
+      await addReviewToBuilding(buildingId, review);
+      delete selectedRating[buildingId];
+      showToast('Review posted! Thank you ✓');
+      // onSnapshot fires → cache updated → re-render
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save — check Firestore rules', true);
+      btn.textContent = 'Post Review';
+      btn.disabled    = false;
+    }
+  }
+
+  function closePanel() {
+    sidePanel.classList.remove('open');
+    currentBuildingId = null;
+    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+    setTimeout(() => {
+      panelInner.innerHTML = `<div class="panel-empty">
+        <div class="big-icon">🏙️</div>
+        <h3>Select a building</h3>
+        <p>Click a pin on the map or drop a new one to read and write tenant reviews.</p>
+      </div>`;
+    }, 350);
+  }
+  window._closePanel = closePanel;
+
+  // ─── REAL-TIME PANEL REFRESH ───────────────────────────────────────────────
+  // When onSnapshot fires a 'modified' event for the open building, re-render
+  const _origListener = onSnapshot;
+  onSnapshot(BUILDINGS, (snapshot) => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === 'modified' && change.doc.id === currentBuildingId) {
+        const updated = { id: change.doc.id, ...change.doc.data() };
+        if (!updated.reviews) updated.reviews = [];
+        cache[updated.id] = updated;
+        renderPanel(updated);
+        if (leafletMarkers[updated.id]) {
+          leafletMarkers[updated.id].setIcon(createMarkerIcon(updated));
+        }
+      }
+    });
+    updateStats();
+  });
+
+  // ─── UTILITIES ─────────────────────────────────────────────────────────────
+  function updateStats() {
+    const buildings = Object.values(cache);
+    document.getElementById('stat-buildings').textContent = buildings.length;
+    document.getElementById('stat-reviews').textContent   = buildings.reduce((s, b) => s + (b.reviews ? b.reviews.length : 0), 0);
+  }
+
+  function formatDate(dateStr) {
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch { return dateStr; }
+  }
+
+  function showToast(msg, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className   = 'toast' + (isError ? ' error' : '');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+  // expose for header search button
+  window._doSearch = doSearch;
+</script>
+<style>
+  :root {
+    --ink: #0f0e0d;
+    --paper: #f5f0e8;
+    --cream: #ede7d9;
+    --amber: #e8a020;
+    --amber-light: #f5c84a;
+    --red: #c93030;
+    --green: #2d7a4f;
+    --panel: #1a1916;
+    --panel-border: #2e2c29;
+    --muted: #7a7570;
+    --star-fill: #e8a020;
+    --star-empty: #3a3834;
+    --radius: 12px;
+    --radius-sm: 6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--ink);
+    color: var(--paper);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-border);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    z-index: 1000;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .logo span { color: var(--amber); }
+
+  .search-wrap {
+    flex: 1;
+    max-width: 500px;
+    position: relative;
+  }
+  .search-wrap input {
+    width: 100%;
+    background: #242220;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm);
+    padding: 9px 40px 9px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    color: var(--paper);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-wrap input:focus { border-color: var(--amber); }
+  .search-wrap button {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    display: flex; align-items: center;
+    transition: color 0.2s;
+  }
+  .search-wrap button:hover { color: var(--amber); }
+
+  #search-results {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    z-index: 2000;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #search-results.show { display: block; }
+  .search-result-item {
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--panel-border);
+    transition: background 0.15s;
+  }
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover { background: #2a2826; }
+  .search-result-item .addr-main { color: var(--paper); font-weight: 500; }
+  .search-result-item .addr-sub { color: var(--muted); font-size: 0.75rem; margin-top: 1px; }
+
+  .header-stats {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .header-stats strong { color: var(--amber); font-family: 'Syne', sans-serif; font-size: 0.9rem; }
+
+  /* MAIN LAYOUT */
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* MAP */
+  #map {
+    flex: 1;
+    position: relative;
+    cursor: crosshair;
+  }
+
+  /* Leaflet override for dark theme */
+  .leaflet-tile { filter: brightness(0.85) contrast(1.1) saturate(0.8); }
+  .leaflet-control-zoom a {
+    background: var(--panel) !important;
+    color: var(--paper) !important;
+    border-color: var(--panel-border) !important;
+  }
+
+  /* Custom marker */
+  .custom-marker {
+    width: 36px; height: 36px;
+    background: var(--amber);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 3px solid var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .custom-marker.reviewed {
+    background: var(--green);
+  }
+  .custom-marker-inner {
+    transform: rotate(45deg);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: 'Syne', sans-serif;
+    line-height: 1;
+    text-align: center;
+  }
+  .temp-marker {
+    width: 20px; height: 20px;
+    background: var(--amber);
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.7; }
+  }
+
+  /* MAP CLICK HINT */
+  .map-hint {
+    position: absolute;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15,14,13,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--panel-border);
+    border-radius: 24px;
+    padding: 10px 20px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    z-index: 500;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .map-hint span { color: var(--amber); }
+
+  /* SIDE PANEL */
+  #side-panel {
+    width: 0;
+    overflow: hidden;
+    transition: width 0.35s cubic-bezier(0.4,0,0.2,1);
+    background: var(--panel);
+    border-left: 1px solid var(--panel-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  #side-panel.open { width: 420px; }
+
+  .panel-inner {
+    width: 420px;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-inner::-webkit-scrollbar { width: 4px; }
+  .panel-inner::-webkit-scrollbar-track { background: transparent; }
+  .panel-inner::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+  /* PANEL: building header */
+  .building-header {
+    padding: 24px 24px 20px;
+    border-bottom: 1px solid var(--panel-border);
+    position: relative;
+  }
+  .building-header .close-btn {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 1.2rem; line-height: 1;
+    transition: color 0.2s;
+  }
+  .building-header .close-btn:hover { color: var(--paper); }
+
+  .building-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 6px;
+  }
+  .building-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    line-height: 1.2;
+    color: var(--paper);
+    margin-bottom: 4px;
+  }
+  .building-addr {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .rating-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .rating-big {
+    font-family: 'Syne', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--amber);
+    line-height: 1;
+  }
+  .rating-info { flex: 1; }
+  .stars-display { display: flex; gap: 3px; margin-bottom: 4px; }
+  .star-icon { font-size: 1rem; }
+  .star-icon.filled { color: var(--star-fill); }
+  .star-icon.empty { color: var(--star-empty); }
+  .review-count { font-size: 0.75rem; color: var(--muted); }
+
+  /* PANEL: rating bars */
+  .rating-bars {
+    padding: 0 24px 16px;
+    border-bottom: 1px solid var(--panel-border);
+    margin-top: 12px;
+  }
+  .rating-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .rating-bar-row .label { width: 8px; text-align: right; }
+  .rating-bar-row .star-sm { color: var(--amber); font-size: 0.65rem; }
+  .bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--panel-border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--amber);
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .bar-count { width: 20px; text-align: right; font-size: 0.7rem; }
+
+  /* PANEL: write review */
+  .write-review {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    color: var(--paper);
+    margin-bottom: 14px;
+  }
+
+  .star-picker {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: var(--star-empty);
+    transition: color 0.15s, transform 0.15s;
+    padding: 2px;
+    line-height: 1;
+  }
+  .star-btn:hover, .star-btn.active { color: var(--star-fill); }
+  .star-btn:hover { transform: scale(1.2); }
+
+  .review-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .review-fields input,
+  .review-fields textarea {
+    background: #242220;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    color: var(--paper);
+    outline: none;
+    resize: none;
+    transition: border-color 0.2s;
+  }
+  .review-fields input:focus,
+  .review-fields textarea:focus { border-color: var(--amber); }
+  .review-fields input::placeholder,
+  .review-fields textarea::placeholder { color: var(--muted); }
+  .review-fields textarea { min-height: 80px; }
+
+  .submit-btn {
+    margin-top: 4px;
+    width: 100%;
+    padding: 11px;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .submit-btn:hover { background: var(--amber-light); }
+  .submit-btn:active { transform: scale(0.98); }
+
+  /* PANEL: reviews list */
+  .reviews-list {
+    padding: 20px 24px;
+    flex: 1;
+  }
+  .review-card {
+    background: #242220;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .review-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .reviewer-info { }
+  .reviewer-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--paper);
+  }
+  .review-meta {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .review-stars { display: flex; gap: 2px; }
+  .review-stars .s { font-size: 0.75rem; }
+  .review-stars .s.f { color: var(--star-fill); }
+  .review-stars .s.e { color: var(--star-empty); }
+  .review-body {
+    font-size: 0.82rem;
+    color: #c0bab2;
+    line-height: 1.55;
+  }
+
+  .no-reviews {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-style: italic;
+  }
+  .no-reviews .icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+
+  /* EMPTY STATE */
+  .panel-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .panel-empty .big-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+  .panel-empty h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    color: var(--paper);
+    margin-bottom: 8px;
+  }
+  .panel-empty p { font-size: 0.82rem; line-height: 1.5; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--green);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 500;
+    z-index: 9999;
+    transform: translateY(60px);
+    opacity: 0;
+    transition: transform 0.3s, opacity 0.3s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--red); }
+
+  /* Leaflet popup override */
+  .leaflet-popup-content-wrapper {
+    background: var(--panel) !important;
+    border: 1px solid var(--panel-border) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+    color: var(--paper) !important;
+    font-family: 'DM Sans', sans-serif !important;
+  }
+  .leaflet-popup-tip { background: var(--panel) !important; }
+  .leaflet-popup-content { margin: 12px 16px !important; font-size: 0.82rem !important; }
+  .popup-addr { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+  .popup-rating { color: var(--amber); font-size: 0.8rem; }
+  .popup-btn {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 6px 14px;
+    background: var(--amber);
+    color: var(--ink);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s;
+  }
+  .popup-btn:hover { background: var(--amber-light); }
+
+  /* Rating badge colors */
+  .badge-good { color: var(--green); }
+  .badge-mid { color: var(--amber); }
+  .badge-bad { color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>home</span>resi</div>
+  <div class="search-wrap">
+    <input type="text" id="search-input" placeholder="Search NYC buildings on homeresi..." autocomplete="off">
+    <button onclick="window._doSearch()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <div id="search-results"></div>
+  </div>
+  <div class="header-stats">
+    <div><strong id="stat-buildings">0</strong> buildings</div>
+    <div><strong id="stat-reviews">0</strong> reviews</div>
+  </div>
+</header>
+
+<div class="app-body">
+  <div id="map">
+    <div class="map-hint">📍 Click anywhere on the map to <span>add a building</span> & leave a review</div>
+  </div>
+
+  <div id="side-panel">
+    <div class="panel-inner" id="panel-inner">
+      <div class="panel-empty">
+        <div class="big-icon">🏙️</div>
+        <h3>Select a building</h3>
+        <p>Click a pin on the map or drop a new one to read and write tenant reviews.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+</body>
+</html>
