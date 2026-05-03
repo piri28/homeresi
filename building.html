@@ -7,46 +7,51 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: auto; }
-        .building-header { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        .review-card { background: #f9f9f9; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid #007bff; }
-        .loading { color: #666; font-style: italic; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; padding: 20px; color: #333; background-color: #f4f7f6; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .building-header { border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 25px; }
+        .building-header h1 { margin: 0; color: #2c3e50; }
+        .review-card { background: #ffffff; padding: 15px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #e0e0e0; border-left: 5px solid #007bff; }
+        .review-card p { margin: 5px 0; }
+        .review-author { font-weight: bold; color: #007bff; }
+        .review-rating { color: #f39c12; font-weight: bold; }
+        .loading { color: #666; font-style: italic; text-align: center; margin-top: 50px; }
+        .error { color: #e74c3c; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="loading-message" class="loading">Loading building details...</div>
+    <div id="status-message" class="loading">Fetching data from server...</div>
     
     <div id="content" style="display: none;">
         <div class="building-header">
-            <h1 id="building-name">Loading Name...</h1>
-            <p id="building-address" style="color: #666;"></p>
+            <h1 id="building-name">Loading...</h1>
+            <p id="building-address" style="color: #7f8c8d; font-size: 1.1em;"></p>
         </div>
 
-        <h3>User Reviews</h3>
+        <h3>Community Reviews</h3>
         <div id="reviews-list">
             </div>
     </div>
 </div>
 
 <script>
-    // YOUR FIREBASE CONFIGURATION
+    // Paste your Firebase Config here
     const firebaseConfig = {
-        apiKey: "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
+        apiKey: "YOUR_API_KEY",
         authDomain: "homeresi.firebaseapp.com",
         projectId: "homeresi",
         storageBucket: "homeresi.appspot.com",
-        messagingSenderId: "1044254777018",
-        appId: "1:1044254777018:web:f01ebcffc70401b705ac83"
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
     };
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Get Building ID from URL (e.g., /building/ID)
+    // Function to extract ID from URL
     const getBuildingId = () => {
         const path = window.location.pathname;
         const segments = path.split('/');
@@ -56,44 +61,49 @@
     const buildingId = getBuildingId();
 
     if (buildingId) {
-        // Fetch Building Data
+        // Fetch Building Document
         db.collection("buildings").doc(buildingId).get().then((doc) => {
             if (doc.exists) {
                 const data = doc.data();
-                document.getElementById("building-name").innerText = data.name || "Unknown Building";
-                document.getElementById("building-address").innerText = data.address || "No address provided";
                 
-                // Show content, hide loading
-                document.getElementById("loading-message").style.display = "none";
+                // Update UI with Building Data
+                document.getElementById("building-name").innerText = data.name || "Unnamed Building";
+                document.getElementById("building-address").innerText = data.address || "Address not available";
+                
+                // Process Reviews Array
+                const reviewsContainer = document.getElementById("reviews-list");
+                
+                if (data.reviews && Array.isArray(data.reviews) && data.reviews.length > 0) {
+                    reviewsContainer.innerHTML = ""; // Clear placeholder
+                    data.reviews.forEach((item) => {
+                        const card = document.createElement("div");
+                        card.className = "review-card";
+                        card.innerHTML = `
+                            <p><span class="review-author">${item.author || 'Anonymous'}</span></p>
+                            <p>${item.text || 'No comment text provided.'}</p>
+                            <p class="review-rating">Rating: ${item.rating || 0}/5</p>
+                        `;
+                        reviewsContainer.appendChild(card);
+                    });
+                } else {
+                    reviewsContainer.innerHTML = "<p>No reviews found for this building yet.</p>";
+                }
+
+                // Show Content
+                document.getElementById("status-message").style.display = "none";
                 document.getElementById("content").style.display = "block";
-
-                // Fetch Related Reviews (assuming you have a 'comments' collection)
-                fetchReviews(buildingId);
             } else {
-                document.getElementById("loading-message").innerText = "Building not found.";
+                document.getElementById("status-message").className = "error";
+                document.getElementById("status-message").innerText = "Error: Building not found in our database.";
             }
-        }).catch((error) => {
-            console.error("Error fetching building:", error);
-            document.getElementById("loading-message").innerText = "Error loading data.";
+        }).catch((err) => {
+            console.error("Database Error:", err);
+            document.getElementById("status-message").className = "error";
+            document.getElementById("status-message").innerText = "Technical Error: Unable to connect to database.";
         });
+    } else {
+        document.getElementById("status-message").innerText = "Invalid URL. No building ID provided.";
     }
-
-    const fetchReviews = (id) => {
-        const reviewsContainer = document.getElementById("reviews-list");
-        db.collection("comments").where("buildingId", "==", id).get().then((querySnapshot) => {
-            if (querySnapshot.empty) {
-                reviewsContainer.innerHTML = "<p>No reviews yet. Be the first to review!</p>";
-                return;
-            }
-            querySnapshot.forEach((doc) => {
-                const review = doc.data();
-                const card = document.createElement("div");
-                card.className = "review-card";
-                card.innerHTML = `<p>${review.text}</p><small>Rating: ${review.rating}/5</small>`;
-                reviewsContainer.appendChild(card);
-            });
-        });
-    };
 </script>
 
 </body>
