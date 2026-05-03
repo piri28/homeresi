@@ -6,3 +6,9 @@
     }
   ]
 }
+{
+  "rewrites": [
+    { "source": "/building/:id", "destination": "/building.html" },
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" }
+  ]
+}
