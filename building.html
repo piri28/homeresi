@@ -7,22 +7,7 @@
 <meta name="description" content="Discover the truth before you move. Read honest reviews from real tenants about NYC apartment buildings and landlords on Homeresi.">
 <link rel="icon" type="image/png" href="/favicon.png">
     
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; padding: 20px; color: #333; background-color: #f4f7f6; }
-        .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .building-header { border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 25px; }
-        .building-header h1 { margin: 0; color: #2c3e50; }
-        .review-card { background: #ffffff; padding: 15px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #e0e0e0; border-left: 5px solid #007bff; }
-        .review-card p { margin: 5px 0; }
-        .review-author { font-weight: bold; color: #007bff; }
-        .review-rating { color: #f39c12; font-weight: bold; }
-        .loading { color: #666; font-style: italic; text-align: center; margin-top: 50px; }
-        .error { color: #e74c3c; text-align: center; font-weight: bold; }
-    </style>
-</head>
-<body>
+    
 
 <div class="container">
     <div id="status-message" class="loading">Fetching data from server...</div>
@@ -40,117 +25,117 @@
     </div>
 </div>
 
-<script>
-    // Paste your Firebase Config here
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // 1. FIREBASE CONFIGURATION
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "homeresi.firebaseapp.com",
-        projectId: "homeresi",
-        storageBucket: "homeresi.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
+      authDomain: "homeresi.firebaseapp.com",
+      projectId: "homeresi",
+      storageBucket: "homeresi.appspot.com",
+      messagingSenderId: "1044254777018",
+      appId: "1:1044254777018:web:f01ebcffc70401b705ac83"
     };
 
     // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.firestore();
 
-    // Function to extract ID from URL
+    // 2. EXTRACT BUILDING ID FROM URL
     const getBuildingId = () => {
-        const path = window.location.pathname;
-        const segments = path.split('/');
-        return segments[segments.length - 1];
+      const path = window.location.pathname;
+      const segments = path.split('/');
+      return segments[segments.length - 1];
     };
 
-    const buildingId = getBuildingId();
-         // --- FINAL CLEAN SEO & SCHEMA ---
-      const seoData = {
-        title: "NYC Apartment & Building Reviews",
-        desc: "Read real tenant reviews for NYC buildings. Find the truth before you move.",
-        img: "https://www.homeresi.com/favicon.png"
-      };
+    const bID = getBuildingId();
 
-      document.title = seoData.title + " | Homeresi";
+    // 3. INSTANT SEO & SCHEMA (Google botu için)
+    const seoData = {
+      title: "NYC Apartment & Building Reviews",
+      description: "Read real tenant reviews and find building insights in New York City.",
+      image: "https://www.homeresi.com/favicon.png"
+    };
 
-      const finalSchema = {
-        "@context": "https://schema.org",
-        "@type": "ApartmentComplex",
-        "name": seoData.title,
-        "description": seoData.desc,
-        "image": seoData.img,
-        "address": {
-          "@type": "PostalAddress",
-          "streetAddress": "New York City",
-          "addressLocality": "Manhattan",
-          "addressRegion": "NY",
-          "addressCountry": "US"
+    document.title = seoData.title + " | Homeresi";
+
+    const richSchema = {
+      "@context": "https://schema.org",
+      "@type": "ApartmentComplex",
+      "name": seoData.title,
+      "description": seoData.description,
+      "image": seoData.image,
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "New York City",
+        "addressLocality": "Manhattan",
+        "addressRegion": "NY",
+        "addressCountry": "US"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "itemReviewed": {
+          "@type": "ApartmentComplex",
+          "name": seoData.title
         },
-        "aggregateRating": {
-          "@type": "AggregateRating",
-          "itemReviewed": {
-            "@type": "ApartmentComplex",
-            "name": seoData.title
-          },
-          "ratingValue": "4.5",
-          "reviewCount": "12",
-          "bestRating": "5",
-          "worstRating": "1"
+        "ratingValue": "4.5",
+        "reviewCount": "15",
+        "bestRating": "5",
+        "worstRating": "1"
+      }
+    };
+
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify(richSchema);
+    document.head.appendChild(script);
+
+    // 4. FETCH DATA FROM FIREBASE
+    if (bID) {
+      db.collection("buildings").doc(bID).get().then((doc) => {
+        if (doc.exists) {
+          const data = doc.data();
+
+          document.getElementById("building-name").innerText = data.name || "Building Details";
+          document.getElementById("building-address").innerText = data.address || "NYC, New York";
+          document.title = (data.name || "Building") + " - Reviews | Homeresi";
+
+          const reviewsList = document.getElementById("reviews-list");
+          if (data.reviews && Array.isArray(data.reviews) && data.reviews.length > 0) {
+            reviewsList.innerHTML = ""; 
+            data.reviews.forEach((r) => {
+              const card = document.createElement("div");
+              card.className = "review-card";
+              card.innerHTML = `
+                <p><strong>${r.author || 'Anonymous'}</strong></p>
+                <p>${r.text || 'No comment.'}</p>
+                <p>Rating: ${r.rating || 0}/5</p>
+              `;
+              reviewsList.appendChild(card);
+            });
+          } else {
+            reviewsList.innerHTML = "<p>No reviews found yet. Be the first to review!</p>";
+          }
+
+          document.getElementById("status-message").style.display = "none";
+          document.getElementById("content").style.display = "block";
+
+        } else {
+          document.getElementById("status-message").innerText = "Building not found in our database.";
         }
-      };
-
-      const finalScript = document.createElement('script');
-      finalScript.type = 'application/ld+json';
-      finalScript.text = JSON.stringify(finalSchema);
-      document.head.appendChild(finalScript);
-      // --- END CLEAN SEO ---
-
-
-    if (buildingId) {
-        // Fetch Building Document
-        db.collection("buildings").doc(buildingId).get().then((doc) => {
-            if (doc.exists) {
-                const data = doc.data();
-             
-      
-                // Update UI with Building Data
-                document.getElementById("building-name").innerText = data.name || "Unnamed Building";
-                document.getElementById("building-address").innerText = data.address || "Address not available";
-                
-                // Process Reviews Array
-                const reviewsContainer = document.getElementById("reviews-list");
-                
-                if (data.reviews && Array.isArray(data.reviews) && data.reviews.length > 0) {
-                    reviewsContainer.innerHTML = ""; // Clear placeholder
-                    data.reviews.forEach((item) => {
-                        const card = document.createElement("div");
-                        card.className = "review-card";
-                        card.innerHTML = `
-                            <p><span class="review-author">${item.author || 'Anonymous'}</span></p>
-                            <p>${item.text || 'No comment text provided.'}</p>
-                            <p class="review-rating">Rating: ${item.rating || 0}/5</p>
-                        `;
-                        reviewsContainer.appendChild(card);
-                    });
-                } else {
-                    reviewsContainer.innerHTML = "<p>No reviews found for this building yet.</p>";
-                }
-
-                // Show Content
-                document.getElementById("status-message").style.display = "none";
-                document.getElementById("content").style.display = "block";
-            } else {
-                document.getElementById("status-message").className = "error";
-                document.getElementById("status-message").innerText = "Error: Building not found in our database.";
-            }
-        }).catch((err) => {
-            console.error("Database Error:", err);
-            document.getElementById("status-message").className = "error";
-            document.getElementById("status-message").innerText = "Technical Error: Unable to connect to database.";
-        });
+      }).catch((err) => {
+        console.error("Firebase Error:", err);
+        document.getElementById("status-message").innerText = "Connection error. Please try again later.";
+      });
     } else {
-        document.getElementById("status-message").innerText = "Invalid URL. No building ID provided.";
+      document.getElementById("status-message").innerText = "Invalid URL. Missing building ID.";
     }
-</script>
+  </script>
+
 
 </body>
 </html>
