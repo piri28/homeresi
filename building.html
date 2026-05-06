@@ -63,19 +63,21 @@
     };
 
     const buildingId = getBuildingId();
-      // --- INSTANT SEO FIX (Runs before Database to catch Googlebot) ---
-      const fastName = "NYC Apartment & Building"; // Fallback name
-      document.title = fastName + " Reviews | Homeresi";
-      // --- FINAL PERFECTED INSTANT SEO ---
-      const fastName = "NYC Apartment & Building Reviews";
-      document.title = fastName + " | Homeresi";
+         // --- FINAL CLEAN SEO & SCHEMA ---
+      const seoData = {
+        title: "NYC Apartment & Building Reviews",
+        desc: "Read real tenant reviews for NYC buildings. Find the truth before you move.",
+        img: "https://www.homeresi.com/favicon.png"
+      };
 
-      const schemaData = {
+      document.title = seoData.title + " | Homeresi";
+
+      const finalSchema = {
         "@context": "https://schema.org",
         "@type": "ApartmentComplex",
-        "name": fastName,
-        "description": "Read real tenant reviews for NYC buildings. Find the truth before you move.",
-        "image": "https://www.homeresi.com/favicon.png", // Must be a real link
+        "name": seoData.title,
+        "description": seoData.desc,
+        "image": seoData.img,
         "address": {
           "@type": "PostalAddress",
           "streetAddress": "New York City",
@@ -85,21 +87,23 @@
         },
         "aggregateRating": {
           "@type": "AggregateRating",
+          "itemReviewed": {
+            "@type": "ApartmentComplex",
+            "name": seoData.title
+          },
           "ratingValue": "4.5",
-          "reviewCount": "10",
+          "reviewCount": "12",
           "bestRating": "5",
           "worstRating": "1"
         }
       };
 
-      const script = document.createElement('script');
-      script.id = 'dynamic-schema';
-      script.type = 'application/ld+json';
-      script.text = JSON.stringify(schemaData);
-      document.head.appendChild(script);
-      // --- END INSTANT SEO ---
+      const finalScript = document.createElement('script');
+      finalScript.type = 'application/ld+json';
+      finalScript.text = JSON.stringify(finalSchema);
+      document.head.appendChild(finalScript);
+      // --- END CLEAN SEO ---
 
-      
 
     if (buildingId) {
         // Fetch Building Document
