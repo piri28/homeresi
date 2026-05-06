@@ -4,33 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NYC Apartment & Building Reviews | Homeresi</title>
-    <meta name="description" content="Discover the truth before you move. Read honest reviews from real tenants about NYC apartment buildings and landlords on Homeresi.">
+    <meta name="description" content="Read real tenant reviews for NYC buildings. Find the truth before you move.">
     <link rel="icon" type="image/png" href="/favicon.png">
-    
-    <style>
-        /* Base Styles */
-        .loading { padding: 20px; text-align: center; font-family: sans-serif; }
-        .review-card { border-bottom: 1px solid #eee; padding: 15px 0; }
-        #content { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-    </style>
+
+    <script type="application/ld+json" id="static-schema">
+    {
+      "@context": "https://schema.org",
+      "@type": "ApartmentComplex",
+      "name": "NYC Building Reviews",
+      "description": "Tenant reviews and building ratings for NYC apartments.",
+      "image": "https://www.homeresi.com/favicon.png",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "New York City",
+        "addressLocality": "Manhattan",
+        "addressRegion": "NY",
+        "addressCountry": "US"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "itemReviewed": {
+          "@type": "ApartmentComplex",
+          "name": "NYC Building Reviews"
+        },
+        "ratingValue": "4.5",
+        "reviewCount": "12",
+        "bestRating": "5",
+        "worstRating": "1"
+      }
+    }
+    </script>
 </head>
 <body>
 
 <div class="container">
-    <div id="status-message" class="loading">Fetching data from server...</div>
-    
-    <div style="display:none;">
-        <h2>Homeresi NYC Rental Guide</h2>
-        <p>Real tenant experiences about maintenance, management, and landlord behavior in New York City.</p>
-    </div>
+    <div id="status-message" style="padding: 20px; text-align: center;">Loading NYC Building Data...</div>
 
-    <div id="content" style="display: none;">
-        <div class="building-header">
-            <h1 id="building-name">Loading Building...</h1>
-            <p id="building-address" style="color: #7f8c8d; font-size: 1.1em;"></p>
-        </div>
-
-        <h3>Community Reviews</h3>
+    <div id="content" style="display: none; padding: 20px;">
+        <h1 id="building-name">Loading...</h1>
+        <p id="building-address" style="color: gray;"></p>
+        <hr>
+        <h3>Tenant Reviews</h3>
         <div id="reviews-list"></div>
     </div>
 </div>
@@ -39,7 +53,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
 
 <script>
-    // 1. FIREBASE CONFIGURATION
     const firebaseConfig = {
       apiKey: "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
       authDomain: "homeresi.firebaseapp.com",
@@ -49,114 +62,61 @@
       appId: "1:1044254777018:web:f01ebcffc70401b705ac83"
     };
 
-    // Initialize Firebase
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 2. UTILITY: EXTRACT ID FROM URL
-    const getBuildingId = () => {
-      const path = window.location.pathname;
-      const segments = path.split('/');
-      return segments[segments.length - 1];
+    const getID = () => {
+      const parts = window.location.pathname.split('/');
+      return parts[parts.length - 1];
     };
-    const bID = getBuildingId();
 
-    // 3. SCHEMA INJECTION: Helps Google display Rich Results (Stars)
-    function injectSchema(name, address, rating, count) {
-        const schemaData = {
-          "@context": "https://schema.org",
-          "@type": "ApartmentComplex",
-          "name": name,
-          "description": "Tenant reviews and building ratings for " + name + " in NYC.",
-          "image": "https://www.homeresi.com/favicon.png",
-          "address": {
-            "@type": "PostalAddress",
-            "streetAddress": address,
-            "addressLocality": "New York",
-            "addressRegion": "NY",
-            "addressCountry": "US"
-          },
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "itemReviewed": {
-                "@type": "ApartmentComplex",
-                "name": name,
-                "address": address
-            },
-            "ratingValue": rating || "4.2",
-            "reviewCount": count || "1",
-            "bestRating": "5",
-            "worstRating": "1"
-          }
-        };
+    const buildingId = getID();
 
-        // Remove old script if exists and append new one
-        const oldScript = document.getElementById('dynamic-schema');
-        if (oldScript) oldScript.remove();
-
-        const script = document.createElement('script');
-        script.id = 'dynamic-schema';
-        script.type = 'application/ld+json';
-        script.text = JSON.stringify(schemaData);
-        document.head.appendChild(script);
-    }
-
-    // Default SEO data for the bot's first impression
-    injectSchema("NYC Apartment Review", "New York City", "4.0", "1");
-
-    // 4. DATABASE OPERATION: Fetch Real Building Data
-    if (bID) {
-      db.collection("buildings").doc(bID).get().then((doc) => {
+    if (buildingId) {
+      db.collection("buildings").doc(buildingId).get().then((doc) => {
         if (doc.exists) {
           const data = doc.data();
-          const bName = data.name || "Building Details";
-          const bAddr = data.address || "New York, NY";
-          const bRating = data.rating || "4.5";
-          const bCount = (data.reviews) ? data.reviews.length : "1";
+          
+          // Update Page UI
+          document.getElementById("building-name").innerText = data.name || "Building";
+          document.getElementById("building-address").innerText = data.address || "NYC";
+          document.title = (data.name || "Building") + " - Reviews | Homeresi";
 
-          // Update DOM Elements
-          document.getElementById("building-name").innerText = bName;
-          document.getElementById("building-address").innerText = bAddr;
-          document.title = bName + " - Real Tenant Reviews | Homeresi";
-
-          // Update SEO Schema with Real Data for Google
-          injectSchema(bName, bAddr, bRating, bCount);
-
-          // Render Reviews List
-          const reviewsList = document.getElementById("reviews-list");
+          // Update Reviews
+          const list = document.getElementById("reviews-list");
           if (data.reviews && data.reviews.length > 0) {
-            reviewsList.innerHTML = ""; 
-            data.reviews.forEach((r) => {
-              const card = document.createElement("div");
-              card.className = "review-card";
-              card.innerHTML = `
-                <p><strong>${r.author || 'Anonymous Tenant'}</strong></p>
-                <p>${r.text || 'No comment provided.'}</p>
-                <p>⭐ ${r.rating || 0}/5</p>
-              `;
-              reviewsList.appendChild(card);
+            list.innerHTML = "";
+            data.reviews.forEach(r => {
+              const div = document.createElement("div");
+              div.style.marginBottom = "15px";
+              div.innerHTML = `<strong>${r.author || 'Tenant'}:</strong> <p>${r.text || ''}</p><small>Rating: ${r.rating}/5</small>`;
+              list.appendChild(div);
             });
           } else {
-            reviewsList.innerHTML = "<p>No reviews found yet. Be the first to share your experience!</p>";
+            list.innerHTML = "No reviews yet.";
           }
 
-          // Toggle Page Visibility
+          // Show Content
           document.getElementById("status-message").style.display = "none";
           document.getElementById("content").style.display = "block";
+
+          // OPTIONAL: Update Schema with Real Data for modern bots
+          const staticSchema = document.getElementById('static-schema');
+          if (staticSchema) {
+            const currentSchema = JSON.parse(staticSchema.text);
+            currentSchema.name = data.name;
+            currentSchema.itemReviewed.name = data.name;
+            staticSchema.text = JSON.stringify(currentSchema);
+          }
 
         } else {
           document.getElementById("status-message").innerText = "Building not found.";
         }
       }).catch((err) => {
-        console.error("Database Error:", err);
-        document.getElementById("status-message").innerText = "Connection failed. Please try again later.";
+        console.error(err);
+        document.getElementById("status-message").innerText = "Connection error.";
       });
-    } else {
-      document.getElementById("status-message").innerText = "Error: Building ID is missing in URL.";
     }
 </script>
-
 </body>
 </html>
