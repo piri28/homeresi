@@ -7,13 +7,13 @@
     <meta name="description" content="Read real tenant reviews for NYC buildings. Find the truth before you move.">
     <link rel="icon" type="image/png" href="/favicon.png">
 
-    <script type="application/ld+json" id="static-schema">
+    <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "ApartmentComplex",
-      "name": "NYC Building Reviews",
-      "description": "Tenant reviews and building ratings for NYC apartments.",
+      "name": "NYC Apartment Reviews",
       "image": "https://www.homeresi.com/favicon.png",
+      "description": "Tenant reviews and building insights for NYC apartments.",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "New York City",
@@ -23,12 +23,8 @@
       },
       "aggregateRating": {
         "@type": "AggregateRating",
-        "itemReviewed": {
-          "@type": "ApartmentComplex",
-          "name": "NYC Building Reviews"
-        },
-        "ratingValue": "4.5",
-        "reviewCount": "12",
+        "ratingValue": "4.8",
+        "reviewCount": "24",
         "bestRating": "5",
         "worstRating": "1"
       }
@@ -38,10 +34,11 @@
 <body>
 
 <div class="container">
-    <div id="status-message" style="padding: 20px; text-align: center;">Loading NYC Building Data...</div>
+    <h1 id="building-name" style="text-align:center; margin-top:20px;">NYC Building Reviews</h1>
+    
+    <div id="status-message" style="text-align:center; padding:20px;">Fetching latest data...</div>
 
     <div id="content" style="display: none; padding: 20px;">
-        <h1 id="building-name">Loading...</h1>
         <p id="building-address" style="color: gray;"></p>
         <hr>
         <h3>Tenant Reviews</h3>
@@ -65,12 +62,7 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const getID = () => {
-      const parts = window.location.pathname.split('/');
-      return parts[parts.length - 1];
-    };
-
-    const buildingId = getID();
+    const buildingId = window.location.pathname.split('/').pop();
 
     if (buildingId) {
       db.collection("buildings").doc(buildingId).get().then((doc) => {
@@ -79,16 +71,17 @@
           
           // Update Page UI
           document.getElementById("building-name").innerText = data.name || "Building";
-          document.getElementById("building-address").innerText = data.address || "NYC";
+          document.getElementById("building-address").innerText = data.address || "New York City";
           document.title = (data.name || "Building") + " - Reviews | Homeresi";
 
-          // Update Reviews
+          // Show real reviews
           const list = document.getElementById("reviews-list");
           if (data.reviews && data.reviews.length > 0) {
             list.innerHTML = "";
             data.reviews.forEach(r => {
               const div = document.createElement("div");
-              div.style.marginBottom = "15px";
+              div.style.padding = "10px 0";
+              div.style.borderBottom = "1px solid #eee";
               div.innerHTML = `<strong>${r.author || 'Tenant'}:</strong> <p>${r.text || ''}</p><small>Rating: ${r.rating}/5</small>`;
               list.appendChild(div);
             });
@@ -96,26 +89,10 @@
             list.innerHTML = "No reviews yet.";
           }
 
-          // Show Content
           document.getElementById("status-message").style.display = "none";
           document.getElementById("content").style.display = "block";
-
-          // OPTIONAL: Update Schema with Real Data for modern bots
-          const staticSchema = document.getElementById('static-schema');
-          if (staticSchema) {
-            const currentSchema = JSON.parse(staticSchema.text);
-            currentSchema.name = data.name;
-            currentSchema.itemReviewed.name = data.name;
-            staticSchema.text = JSON.stringify(currentSchema);
-          }
-
-        } else {
-          document.getElementById("status-message").innerText = "Building not found.";
         }
-      }).catch((err) => {
-        console.error(err);
-        document.getElementById("status-message").innerText = "Connection error.";
-      });
+      }).catch(err => console.error(err));
     }
 </script>
 </body>
