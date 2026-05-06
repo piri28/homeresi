@@ -13,7 +13,7 @@
       "@type": "ApartmentComplex",
       "name": "NYC Building Reviews",
       "image": "https://www.homeresi.com/favicon.png",
-      "description": "Tenant reviews and building insights for NYC apartments.",
+      "description": "Real tenant reviews and building insights for New York City apartments.",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "New York City",
@@ -37,7 +37,7 @@
     <h1 id="building-name" style="text-align:center; margin-top:20px;">NYC Building Reviews</h1>
     <p id="building-address" style="color: gray; text-align:center;">New York City, NY</p>
     
-    <div id="status-message" style="text-align:center; padding:20px;">Loading latest community reviews...</div>
+    <div id="status-message" style="text-align:center; padding:20px;">Fetching latest community data...</div>
 
     <div id="content" style="display: none; max-width: 800px; margin: 0 auto;">
         <hr>
@@ -50,6 +50,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
 
 <script>
+    // Firebase Configuration
     const firebaseConfig = {
       apiKey: "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
       authDomain: "homeresi.firebaseapp.com",
@@ -59,9 +60,11 @@
       appId: "1:1044254777018:web:f01ebcffc70401b705ac83"
     };
 
+    // Initialize Firebase
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    // Get Building ID from URL
     const bID = window.location.pathname.split('/').pop();
 
     if (bID && bID !== "building") {
@@ -69,10 +72,12 @@
         if (doc.exists) {
           const data = doc.data();
           
+          // Update Page UI
           document.getElementById("building-name").innerText = data.name || "Building";
           document.getElementById("building-address").innerText = data.address || "NYC";
           document.title = (data.name || "Building") + " - Reviews | Homeresi";
 
+          // Render Reviews
           const list = document.getElementById("reviews-list");
           if (data.reviews && data.reviews.length > 0) {
             list.innerHTML = "";
@@ -87,12 +92,13 @@
             list.innerHTML = "No reviews yet. Be the first to share!";
           }
 
+          // Show Main Content
           document.getElementById("status-message").style.display = "none";
           document.getElementById("content").style.display = "block";
         }
       }).catch(err => {
           console.error(err);
-          document.getElementById("status-message").innerText = "Connection slow. Still trying...";
+          document.getElementById("status-message").innerText = "Connection slow. Re-trying...";
       });
     }
 </script>
