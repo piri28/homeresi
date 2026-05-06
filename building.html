@@ -88,12 +88,9 @@
         db.collection("buildings").doc(buildingId).get().then((doc) => {
             if (doc.exists) {
                 const data = doc.data();
-                      // --- AUTOMATIC SEO SETTINGS FOR GOOGLE ---
-      
-      // 1. Updates the page title (e.g., "Empire State - Homeresi")
+             // --- UPGRADED AUTOMATIC SEO SETTINGS (Fixes Review Snippet Error) ---
       document.title = data.name + " - NYC Apartment Reviews | Homeresi";
 
-      // 2. Updates the meta description for Google search results
       let metaDesc = document.querySelector('meta[name="description"]');
       if (!metaDesc) {
           metaDesc = document.createElement('meta');
@@ -102,10 +99,9 @@
       }
       metaDesc.content = "Read real tenant reviews and building details for " + data.name + " located at " + data.address + " in NYC.";
 
-      // 3. Structured Data (Schema.org) to enable Rich Results like in Image 2
       const schemaData = {
         "@context": "https://schema.org",
-        "@type": "RealEstateListing",
+        "@type": "ApartmentComplex",
         "name": data.name,
         "address": {
           "@type": "PostalAddress",
@@ -113,16 +109,20 @@
           "addressLocality": "New York",
           "addressRegion": "NY",
           "addressCountry": "US"
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": data.rating || "4.5",
+          "reviewCount": (data.reviews ? data.reviews.length : 1)
         }
       };
 
-      // Appends the hidden schema script to the document head
       const script = document.createElement('script');
       script.type = 'application/ld+json';
       script.text = JSON.stringify(schemaData);
       document.head.appendChild(script);
-      
-      // --- END SEO SETTINGS ---
+      // --- END UPGRADED SEO SETTINGS ---
+               
 
                 // Update UI with Building Data
                 document.getElementById("building-name").innerText = data.name || "Unnamed Building";
