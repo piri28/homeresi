@@ -150,9 +150,14 @@
     openNewBuildingPanel(lat,lng,address);
   });
 
-  async function reverseGeocode(lat,lng){
- try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`);const d=await r.json();return d.display_name||`${lat.toFixed(5)},${lng.toFixed(5)}`;}
-   ;}
+    async function reverseGeocode(lat, lng) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`);
+      const d = await r.json();
+      return d.display_name || `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    } catch {
+      return `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    }
   }
 
   // ── SEARCH ────────────────────────────────────────────────────────────────
