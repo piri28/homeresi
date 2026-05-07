@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Homeresi — NYC Tenant Reviews & Apartment Ratings</title>
 <meta name="description" content="Honest tenant reviews for NYC apartment buildings. Read and write reviews, see star ratings, and find the best buildings in New York City.">
-<meta property="og:title" content="homeresi — NYC Tenant Reviews">
-<meta property="og:description" content="Honest tenant reviews for NYC apartment buildings. Read ratings and reviews from real tenants.">
-<meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="/favicon.png">
+
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -33,7 +31,6 @@
 }
 </script>
 
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -48,7 +45,7 @@
     arrayUnion, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // ── FIREBASE INIT ─────────────────────────────────────────────────────────
+  // FIREBASE CONFIG
   const firebaseConfig = {
     apiKey:            "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
     authDomain:        "homeresi.firebaseapp.com",
@@ -59,21 +56,18 @@
     measurementId:     "G-VPQCCNTQZ7"
   };
   const app       = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
   const db        = getFirestore(app);
   const BUILDINGS = collection(db, "buildings");
-
-  // ── IN-MEMORY CACHE ───────────────────────────────────────────────────────
   const cache = {};
 
-  // ── MAP ───────────────────────────────────────────────────────────────────
+  // MAP INIT
   const map = L.map('map', { center:[40.7128,-74.0060], zoom:13, zoomControl:true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'© OpenStreetMap contributors', maxZoom:19
   }).addTo(map);
   const leafletMarkers = {};
 
-  // ── HELPERS ───────────────────────────────────────────────────────────────
+  // CALCULATIONS
   const avgRating = b => (!b.reviews||!b.reviews.length) ? 0 : b.reviews.reduce((s,r)=>s+r.rating,0)/b.reviews.length;
   const ratingColor = avg => avg>=4?'#2d7a4f':avg>=2.5?'#e8a020':'#c93030';
   const starStr = n => [1,2,3,4,5].map(i=>i<=n?'★':'☆').join('');
@@ -86,7 +80,7 @@
     t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3200);
   }
 
-  // ── MARKERS ───────────────────────────────────────────────────────────────
+  // MARKER ICON LOGIC
   function createMarkerIcon(b) {
     const avg=avgRating(b), hasR=b.reviews&&b.reviews.length;
     const color=hasR?ratingColor(avg):'#e8a020', label=hasR?avg.toFixed(1):'+';
@@ -110,7 +104,7 @@
     leafletMarkers[b.id]=m;
   }
 
-  // ── FIRESTORE LISTENER ────────────────────────────────────────────────────
+  // FIRESTORE LISTENER
   onSnapshot(BUILDINGS, snap=>{
     snap.docChanges().forEach(ch=>{
       const d={id:ch.doc.id,...ch.doc.data()};
@@ -122,29 +116,20 @@
           if(leafletMarkers[d.id]) leafletMarkers[d.id].setIcon(createMarkerIcon(d));
         }
       }
-      if(ch.type==='removed'){
-        delete cache[d.id];
-        if(leafletMarkers[d.id]){map.removeLayer(leafletMarkers[d.id]);delete leafletMarkers[d.id];}
-      }
     });
-    updateStats(); renderRecentReviews(); updateSchemaMarkup();
-  }, err=>{ console.error(err); showToast('Could not connect to database',true); });
+    updateStats(); renderRecentReviews();
+  });
 
-  // ── FIRESTORE WRITES ──────────────────────────────────────────────────────
   async function saveNewBuilding(b) {
     await setDoc(doc(BUILDINGS,b.id),{lat:b.lat,lng:b.lng,address:b.address,name:b.name,reviews:b.reviews,createdAt:serverTimestamp()});
   }
-  async function addReviewToBuilding(id,review) {
-    await updateDoc(doc(BUILDINGS,id),{reviews:arrayUnion(review)});
-  }
 
-  // ── MAP CLICK ─────────────────────────────────────────────────────────────
   let tempMarker=null;
   map.on('click', async e=>{
     const {lat,lng}=e.latlng;
     if(tempMarker) map.removeLayer(tempMarker);
     tempMarker=L.marker([lat,lng],{icon:L.divIcon({className:'',
-      html:`<div style="width:20px;height:20px;background:#f5c84a;border-radius:50%;border:3px solid #0f0e0d;animation:pulse2 1s infinite"></div><style>@keyframes pulse2{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}</style>`,
+      html:`<div style="width:20px;height:20px;background:#f5c84a;border-radius:50%;border:3px solid #0f0e0d;animation:pulse2 1s infinite"></div>`,
       iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map);
     const address=await reverseGeocode(lat,lng);
     openNewBuildingPanel(lat,lng,address);
@@ -155,7 +140,6 @@
     catch{return`${lat.toFixed(5)},${lng.toFixed(5)}`;}
   }
 
-  // ── SEARCH ────────────────────────────────────────────────────────────────
   const searchInput=document.getElementById('search-input');
   const searchResults=document.getElementById('search-results');
   let st;
@@ -164,24 +148,19 @@
     if(q.length<3){searchResults.classList.remove('show');return;}
     st=setTimeout(()=>doSearch(q),400);
   });
-  searchInput.addEventListener('keydown',e=>{if(e.key==='Escape')searchResults.classList.remove('show');});
-  document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))searchResults.classList.remove('show');});
 
   async function doSearch(q){
-    q=q||searchInput.value.trim(); if(!q) return;
     try{
       const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+' New York City')}&limit=5&addressdetails=1`);
       const res=await r.json();
       searchResults.innerHTML=res.length
         ?res.map(r=>`<div class="search-result-item" onclick="window._goToLocation(${r.lat},${r.lon},'${escHtml(r.display_name)}')"><div class="addr-main">${r.display_name.split(',')[0]}</div><div class="addr-sub">${r.display_name.split(',').slice(1,3).join(',')}</div></div>`).join('')
-        :'<div class="search-result-item"><div class="addr-main" style="color:#7a7570">No results found</div></div>';
+        :'<div class="search-result-item">No results found</div>';
       searchResults.classList.add('show');
     }catch{}
   }
   window._goToLocation=(lat,lng,addr)=>{map.flyTo([lat,lng],17,{duration:1.2});searchResults.classList.remove('show');searchInput.value=addr.split(',')[0];};
-  window._doSearch=doSearch;
 
-  // ── PANEL ─────────────────────────────────────────────────────────────────
   const sidePanel=document.getElementById('side-panel');
   const panelInner=document.getElementById('panel-inner');
   let currentBuildingId=null;
@@ -193,520 +172,117 @@
     renderPanel(b);
     map.flyTo([b.lat,b.lng],Math.max(map.getZoom(),15),{duration:.8});
     if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
-    // scroll recent-reviews into view on mobile if panel covers map
-    if(window.innerWidth<768) sidePanel.scrollIntoView({behavior:'smooth',block:'start'});
   }
   window._openPanel=openPanel;
 
-  function openNewBuildingPanel(lat,lng,address){
-    sidePanel.classList.add('open'); document.body.classList.add('panel-open');
-    panelInner.innerHTML=`
-      <div class="building-header">
-        <button class="close-btn" onclick="window._closePanel()" aria-label="Close">✕</button>
-        <div class="building-tag">📍 New Building</div>
-        <div class="building-name">${address.split(',')[0]}</div>
-        <div class="building-addr">${address.split(',').slice(1,3).join(',')}</div>
-      </div>
-      <div class="write-review">
-        <div class="section-title">Be the first to review</div>
-        <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Drop your honest experience for future tenants.</p>
-        <div class="star-picker" id="star-picker-new">
-          ${[1,2,3,4,5].map(i=>`<button class="star-btn" data-val="${i}" onclick="window._setRating(this,'new')" aria-label="${i} star">★</button>`).join('')}
-        </div>
-        <div class="review-fields">
-          <input type="text" id="reviewer-name-new" placeholder="Your name (e.g. J. Smith)" autocomplete="name">
-          <textarea id="reviewer-text-new" placeholder="Share your experience as a tenant…" rows="4"></textarea>
-          <button class="submit-btn" id="submit-new-btn">Add Building &amp; Review</button>
-        </div>
-      </div>`;
-    document.getElementById('submit-new-btn').addEventListener('click',()=>submitNewBuilding(lat,lng,address));
-  }
-
-  window._setRating=(btn,id)=>{
-    const v=parseInt(btn.dataset.val); selectedRating[id]=v;
-    btn.closest('.star-picker').querySelectorAll('.star-btn').forEach((b,i)=>b.classList.toggle('active',i<v));
-  };
-
-  async function submitNewBuilding(lat,lng,address){
-    const rating=selectedRating['new']||0, name=document.getElementById('reviewer-name-new').value.trim()||'Anonymous', text=document.getElementById('reviewer-text-new').value.trim();
-    if(!rating){showToast('Please select a star rating',true);return;}
-    if(!text){showToast('Please write a review',true);return;}
-    const id='b'+Date.now(), review={author:name,rating,text,date:new Date().toISOString().slice(0,10)};
-    const building={id,lat,lng,address,name:address.split(',')[0],reviews:[review]};
-    const btn=document.getElementById('submit-new-btn');
-    btn.textContent='Saving…'; btn.disabled=true;
-    try{
-      await saveNewBuilding(building);
-      delete selectedRating['new'];
-      if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
-      showToast('Building added & review posted! ✓'); openPanel(id);
-    }catch(err){
-      console.error(err); showToast('Failed to save — check Firestore rules',true);
-      btn.textContent='Add Building & Review'; btn.disabled=false;
-    }
-  }
-
-  function renderPanel(b){
-    const avg=avgRating(b), rc=b.reviews?b.reviews.length:0, dist=[0,0,0,0,0];
-    if(b.reviews) b.reviews.forEach(r=>{if(r.rating>=1&&r.rating<=5)dist[r.rating-1]++;});
-    panelInner.innerHTML=`
-      <div class="building-header">
-        <button class="close-btn" onclick="window._closePanel()" aria-label="Close">✕</button>
-        <div class="building-tag">🏢 Tenant Reviews</div>
-        <div class="building-name">${b.name||b.address.split(',')[0]}</div>
-        <div class="building-addr">${b.address}</div>
-        ${rc?`<div class="rating-summary">
-          <div class="rating-big ${avg>=4?'badge-good':avg>=2.5?'badge-mid':'badge-bad'}">${avg.toFixed(1)}</div>
-          <div class="rating-info">
-            <div class="stars-display">${[1,2,3,4,5].map(i=>`<span class="star-icon ${i<=Math.round(avg)?'filled':'empty'}">★</span>`).join('')}</div>
-            <div class="review-count">${rc} review${rc!==1?'s':''}</div>
-          </div></div>`:''}
-      </div>
-      ${rc?`<div class="rating-bars">${[5,4,3,2,1].map(s=>`
-        <div class="rating-bar-row">
-          <span class="label">${s}</span><span class="star-sm">★</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${rc?(dist[s-1]/rc*100):0}%"></div></div>
-          <span class="bar-count">${dist[s-1]}</span>
-        </div>`).join('')}</div>`:''}
-      <div class="write-review">
-        <div class="section-title">Write a Review</div>
-        <div class="star-picker" id="star-picker-${b.id}">
-          ${[1,2,3,4,5].map(i=>`<button class="star-btn" data-val="${i}" onclick="window._setRating(this,'${b.id}')" aria-label="${i} star">★</button>`).join('')}
-        </div>
-        <div class="review-fields">
-          <input type="text" id="reviewer-name-${b.id}" placeholder="Your name (e.g. J. Smith)" autocomplete="name">
-          <textarea id="reviewer-text-${b.id}" placeholder="Share your experience as a tenant…" rows="4"></textarea>
-          <button class="submit-btn" id="submit-review-btn-${b.id}">Post Review</button>
-        </div>
-      </div>
-      <div class="reviews-list">
-        <div class="section-title">${rc?`All Reviews (${rc})`:'No reviews yet'}</div>
-        ${rc?b.reviews.slice().reverse().map(r=>`
-          <div class="review-card">
-            <div class="review-card-header">
-              <div class="reviewer-info">
-                <div class="reviewer-name">${r.author}</div>
-                <div class="review-meta">${formatDate(r.date)}</div>
-              </div>
-              <div class="review-stars">${[1,2,3,4,5].map(i=>`<span class="s ${i<=r.rating?'f':'e'}">★</span>`).join('')}</div>
-            </div>
-            <div class="review-body">${r.text}</div>
-          </div>`).join('')
-          :`<div class="no-reviews"><span class="icon">✍️</span>Be the first to review this building.</div>`}
-      </div>`;
-    document.getElementById(`submit-review-btn-${b.id}`).addEventListener('click',()=>submitReview(b.id));
-  }
-
-  async function submitReview(bid){
-    const rating=selectedRating[bid]||0, name=document.getElementById(`reviewer-name-${bid}`).value.trim()||'Anonymous', text=document.getElementById(`reviewer-text-${bid}`).value.trim();
-    if(!rating){showToast('Please select a star rating',true);return;}
-    if(!text){showToast('Please write a review',true);return;}
-    const review={author:name,rating,text,date:new Date().toISOString().slice(0,10)};
-    const btn=document.getElementById(`submit-review-btn-${bid}`);
-    btn.textContent='Saving…'; btn.disabled=true;
-    try{
-      await addReviewToBuilding(bid,review); delete selectedRating[bid]; showToast('Review posted! Thank you ✓');
-    }catch(err){
-      console.error(err); showToast('Failed to save — check Firestore rules',true);
-      btn.textContent='Post Review'; btn.disabled=false;
-    }
-  }
-
-  function closePanel(){
-    sidePanel.classList.remove('open'); document.body.classList.remove('panel-open');
-    currentBuildingId=null;
-    if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
-    setTimeout(()=>{panelInner.innerHTML=`<div class="panel-empty"><div class="big-icon">🏙️</div><h3>Select a building</h3><p>Tap a pin on the map or drop a new one to read and write tenant reviews.</p></div>`;},350);
-  }
-  window._closePanel=closePanel;
-
-  // ── STATS ─────────────────────────────────────────────────────────────────
-  function updateStats(){
-    const bs=Object.values(cache);
-    document.getElementById('stat-buildings').textContent=bs.length;
-    document.getElementById('stat-reviews').textContent=bs.reduce((s,b)=>s+(b.reviews?b.reviews.length:0),0);
-  }
-
-  // ── SEO: RECENT REVIEWS ───────────────────────────────────────────────────
   function renderRecentReviews(){
     const el=document.getElementById('recent-reviews-list'); if(!el) return;
     const all=[];
     Object.values(cache).forEach(b=>(b.reviews||[]).forEach(r=>all.push({...r,buildingName:b.name||b.address.split(',')[0],buildingAddr:b.address,buildingId:b.id})));
     all.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const recent=all.slice(0,12);
-    if(!recent.length){el.innerHTML='<p class="rr-empty">No reviews yet — be the first!</p>';return;}
+    if(!recent.length){el.innerHTML='<p class="rr-empty">No reviews yet!</p>';return;}
     el.innerHTML=recent.map(r=>`
-      <article class="rr-card" onclick="window._openPanel('${r.buildingId}')" role="button" tabindex="0"
-        onkeydown="if(event.key==='Enter')window._openPanel('${r.buildingId}')">
+      <article class="rr-card" onclick="window._openPanel('${r.buildingId}')">
         <div class="rr-top">
           <div class="rr-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=r.rating?'#e8a020':'#3a3834'}">★</span>`).join('')}</div>
-          <time class="rr-date" datetime="${r.date}">${formatDate(r.date)}</time>
+          <time class="rr-date">${formatDate(r.date)}</time>
         </div>
-        <div class="rr-building">
-  <a href="/building/${r.buildingId}" style="text-decoration: none; color: inherit; font-weight: bold;">
-    ${r.buildingName}
-  </a>
-</div>
-
+        <div class="rr-building"><a href="/building/${r.buildingId}" style="text-decoration:none;color:inherit;font-weight:bold;">${r.buildingName}</a></div>
         <div class="rr-addr">${r.buildingAddr.split(',').slice(1,3).join(',').trim()}</div>
-        <p class="rr-text">${r.text.length>120?r.text.slice(0,120)+'…':r.text}</p>
+        <p class="rr-text">${r.text.length>100?r.text.slice(0,100)+'…':r.text}</p>
         <div class="rr-author">— ${r.author}</div>
       </article>`).join('');
   }
 
-  // ── SEO: JSON-LD SCHEMA ───────────────────────────────────────────────────
-  function updateSchemaMarkup(){
-    const buildings=Object.values(cache).filter(b=>b.reviews&&b.reviews.length);
-    if(!buildings.length) return;
-    const schema={
-      "@context":"https://schema.org","@type":"ItemList",
-      "name":"homeresi — NYC Building Reviews",
-      "description":"Tenant reviews and star ratings for New York City apartment buildings",
-      "url":"https://homeresi.app",
-      "itemListElement":buildings.map((b,idx)=>({
-        "@type":"ListItem","position":idx+1,
-        "item":{
-          "@type":"LocalBusiness",
-          "name":b.name||b.address.split(',')[0],
-          "address":{"@type":"PostalAddress","streetAddress":b.address.split(',')[0],"addressLocality":"New York","addressRegion":"NY","addressCountry":"US"},
-          "aggregateRating":{"@type":"AggregateRating","ratingValue":avgRating(b).toFixed(1),"reviewCount":b.reviews.length,"bestRating":"5","worstRating":"1"},
-          "review":b.reviews.slice(-3).map(r=>({"@type":"Review","author":{"@type":"Person","name":r.author},"reviewRating":{"@type":"Rating","ratingValue":r.rating,"bestRating":"5"},"reviewBody":r.text,"datePublished":r.date}))
-        }
-      }))
-    };
-    document.getElementById('review-schema').textContent=JSON.stringify(schema,null,2);
+  function updateStats(){
+    const bs=Object.values(cache);
+    document.getElementById('stat-buildings').textContent=bs.length;
+    document.getElementById('stat-reviews').textContent=bs.reduce((s,b)=>s+(b.reviews?b.reviews.length:0),0);
   }
+
+  window._closePanel=()=> { sidePanel.classList.remove('open'); document.body.classList.remove('panel-open'); };
+  window._setRating=(btn,id)=>{
+    const v=parseInt(btn.dataset.val); selectedRating[id]=v;
+    btn.closest('.star-picker').querySelectorAll('.star-btn').forEach((b,i)=>b.classList.toggle('active',i<v));
+  };
 </script>
 
 <style>
   :root {
-    --ink: #0f0e0d;
-    --paper: #f5f0e8;
-    --amber: #e8a020;
-    --amber-light: #f5c84a;
-    --red: #c93030;
-    --green: #2d7a4f;
-    --panel: #1a1916;
-    --panel-border: #2e2c29;
-    --muted: #7a7570;
-    --star-fill: #e8a020;
-    --star-empty: #3a3834;
-    --radius: 12px;
-    --radius-sm: 6px;
-    --header-h: 56px;
+    --ink: #0f0e0d; --paper: #f5f0e8; --amber: #e8a020; --amber-light: #f5c84a;
+    --red: #c93030; --green: #2d7a4f; --panel: #1a1916; --panel-border: #2e2c29;
+    --muted: #7a7570; --star-fill: #e8a020; --star-empty: #3a3834;
+    --radius: 12px; --radius-sm: 6px; --header-h: 56px;
   }
 
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html { font-size:16px; }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--ink); color:var(--paper); min-height:100vh; overflow-x:hidden; }
 
-  body {
-    font-family:'DM Sans',sans-serif;
-    background:var(--ink); color:var(--paper);
-    min-height:100vh; display:flex; flex-direction:column;
-    overflow-x:hidden;
+  /* SEO H1 Header */
+  .seo-title {
+    background: #000; color: var(--amber); font-family:'Syne',sans-serif;
+    font-size: 0.9rem; text-align: center; padding: 10px; font-weight: 700;
+    border-bottom: 1px solid var(--panel-border);
   }
 
-  /* ── HEADER ─────────────────────────────────────────────────────────────── */
   header {
     background:var(--panel); border-bottom:1px solid var(--panel-border);
-    padding:0 16px; height:var(--header-h);
-    display:flex; align-items:center; gap:12px;
-    position:sticky; top:0; z-index:1000; flex-shrink:0;
+    padding:0 16px; height:var(--header-h); display:flex; align-items:center; gap:12px;
+    position:sticky; top:0; z-index:1000;
   }
-  .logo {
-    font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem;
-    letter-spacing:-.5px; white-space:nowrap; flex-shrink:0;
-  }
+  .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.1rem; }
   .logo span { color:var(--amber); }
 
-  .search-wrap { flex:1; position:relative; min-width:0; }
+  .search-wrap { flex:1; position:relative; }
   .search-wrap input {
     width:100%; background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius-sm); padding:11px 44px 11px 14px;
-    font-family:'DM Sans',sans-serif; font-size:1rem; /* 16px stops iOS zoom */
-    color:var(--paper); outline:none; transition:border-color .2s;
-    -webkit-appearance:none;
+    border-radius:var(--radius-sm); padding:10px 14px; color:var(--paper); outline:none; font-size: 16px;
   }
-  .search-wrap input::placeholder { color:var(--muted); }
-  .search-wrap input:focus { border-color:var(--amber); }
-  .search-wrap button {
-    position:absolute; right:0; top:0; bottom:0;
-    width:44px; background:none; border:none; cursor:pointer;
-    color:var(--muted); display:flex; align-items:center; justify-content:center;
-    transition:color .2s;
-  }
-  .search-wrap button:hover { color:var(--amber); }
 
   #search-results {
-    position:absolute; top:calc(100% + 6px); left:0; right:0;
-    background:var(--panel); border:1px solid var(--panel-border);
-    border-radius:var(--radius-sm); overflow:hidden;
-    z-index:2000; display:none; box-shadow:0 8px 32px rgba(0,0,0,.5);
+    position:absolute; top:100%; left:0; right:0; background:var(--panel);
+    border:1px solid var(--panel-border); z-index:2000; display:none;
   }
   #search-results.show { display:block; }
-  .search-result-item {
-    padding:12px 14px; font-size:.85rem; cursor:pointer;
-    border-bottom:1px solid var(--panel-border); transition:background .15s;
-    min-height:48px; display:flex; flex-direction:column; justify-content:center;
-  }
-  .search-result-item:last-child { border-bottom:none; }
-  .search-result-item:hover,.search-result-item:active { background:#2a2826; }
-  .addr-main { color:var(--paper); font-weight:500; }
-  .addr-sub  { color:var(--muted); font-size:.72rem; margin-top:2px; }
+  .search-result-item { padding:10px; border-bottom:1px solid var(--panel-border); cursor:pointer; font-size:0.8rem; }
 
-  .header-stats {
-    display:flex; gap:12px; font-size:.72rem; color:var(--muted); flex-shrink:0;
-  }
-  .header-stats strong { color:var(--amber); font-family:'Syne',sans-serif; font-size:.85rem; }
-  .stat-label { display:none; }
+  .app-body { display:flex; flex-direction:column; flex:1; }
 
-  /* ── APP BODY ────────────────────────────────────────────────────────────── */
-  .app-body {
-    display:flex; flex-direction:column;
-    flex:1; overflow:hidden;
-  }
-
-  /* ── MAP ─────────────────────────────────────────────────────────────────── */
+  /* RESPONSIVE MAP */
   #map {
-    position:relative; cursor:crosshair;
-    /* Mobile: fixed height so panel is always reachable */
-    height:52vw; min-height:240px; max-height:400px;
-    flex-shrink:0;
+    height: 60vh; /* Covers 60% of screen height on mobile */
+    min-height: 350px; flex-shrink:0; position:relative;
   }
-  .leaflet-tile { filter:brightness(.85) contrast(1.1) saturate(.8); }
-  .leaflet-control-zoom a {
-    background:var(--panel)!important; color:var(--paper)!important;
-    border-color:var(--panel-border)!important;
-    min-width:40px!important; min-height:40px!important;
-    line-height:40px!important; font-size:1.1rem!important;
-  }
-  .map-hint {
-    position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
-    background:rgba(15,14,13,.88); backdrop-filter:blur(8px);
-    border:1px solid var(--panel-border); border-radius:24px;
-    padding:8px 16px; font-size:.72rem; color:var(--muted);
-    z-index:500; pointer-events:none; white-space:nowrap;
-  }
-  .map-hint span { color:var(--amber); }
 
-  /* ── SIDE PANEL (mobile: below map; desktop: aside) ───────────────────── */
   #side-panel {
-    flex:1; background:var(--panel);
-    border-top:1px solid var(--panel-border);
+    background:var(--panel); border-top:1px solid var(--panel-border);
     display:flex; flex-direction:column; overflow:hidden;
   }
-  .panel-inner {
-    flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
-    display:flex; flex-direction:column;
-  }
-  .panel-inner::-webkit-scrollbar { width:4px; }
-  .panel-inner::-webkit-scrollbar-thumb { background:var(--panel-border); border-radius:2px; }
+  .panel-inner { padding: 20px; overflow-y: auto; }
 
-  /* ── PANEL CONTENTS ────────────────────────────────────────────────────── */
-  .building-header {
-    padding:20px 20px 16px; border-bottom:1px solid var(--panel-border); position:relative;
-  }
-  .building-header .close-btn {
-    position:absolute; top:12px; right:12px;
-    background:#2a2826; border:1px solid var(--panel-border);
-    color:var(--muted); cursor:pointer; border-radius:50%;
-    width:44px; height:44px; font-size:1rem;
-    display:flex; align-items:center; justify-content:center;
-    transition:color .2s,background .2s;
-  }
-  .building-header .close-btn:hover { color:var(--paper); background:#3a3834; }
-
-  .building-tag {
-    font-size:.62rem; font-weight:600; letter-spacing:1.5px;
-    text-transform:uppercase; color:var(--amber); margin-bottom:5px;
-  }
-  .building-name {
-    font-family:'Syne',sans-serif; font-weight:700;
-    font-size:1.1rem; line-height:1.2; color:var(--paper); margin-bottom:4px;
-  }
-  .building-addr { font-size:.78rem; color:var(--muted); margin-bottom:14px; }
-
-  .rating-summary { display:flex; align-items:center; gap:12px; }
-  .rating-big { font-family:'Syne',sans-serif; font-size:2.4rem; font-weight:800; color:var(--amber); line-height:1; }
-  .rating-info { flex:1; }
-  .stars-display { display:flex; gap:3px; margin-bottom:4px; }
-  .star-icon { font-size:1rem; }
-  .star-icon.filled { color:var(--star-fill); }
-  .star-icon.empty  { color:var(--star-empty); }
-  .review-count { font-size:.72rem; color:var(--muted); }
-
-  .rating-bars { padding:0 20px 14px; border-bottom:1px solid var(--panel-border); margin-top:10px; }
-  .rating-bar-row { display:flex; align-items:center; gap:7px; margin-bottom:5px; font-size:.7rem; color:var(--muted); }
-  .rating-bar-row .label { width:8px; text-align:right; }
-  .rating-bar-row .star-sm { color:var(--amber); font-size:.62rem; }
-  .bar-track { flex:1; height:4px; background:var(--panel-border); border-radius:2px; overflow:hidden; }
-  .bar-fill  { height:100%; background:var(--amber); border-radius:2px; transition:width .6s cubic-bezier(.4,0,.2,1); }
-  .bar-count { width:20px; text-align:right; font-size:.68rem; }
-
-  .write-review { padding:18px 20px; border-bottom:1px solid var(--panel-border); }
-  .section-title { font-family:'Syne',sans-serif; font-weight:700; font-size:.85rem; letter-spacing:.4px; color:var(--paper); margin-bottom:12px; }
-
-  .star-picker { display:flex; gap:2px; margin-bottom:14px; }
-  .star-btn {
-    background:none; border:none; cursor:pointer;
-    font-size:2rem; color:var(--star-empty);
-    /* 44×44 minimum touch target */
-    min-width:44px; min-height:44px;
-    display:flex; align-items:center; justify-content:center;
-    transition:color .15s,transform .15s;
-  }
-  .star-btn:hover,.star-btn.active { color:var(--star-fill); }
-  .star-btn:hover { transform:scale(1.15); }
-
-  .review-fields { display:flex; flex-direction:column; gap:10px; }
-  .review-fields input,
-  .review-fields textarea {
-    background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius-sm); padding:13px 14px;
-    font-family:'DM Sans',sans-serif; font-size:1rem; /* no iOS zoom */
-    color:var(--paper); outline:none; resize:vertical;
-    transition:border-color .2s; -webkit-appearance:none;
-  }
-  .review-fields input:focus,.review-fields textarea:focus { border-color:var(--amber); }
-  .review-fields input::placeholder,.review-fields textarea::placeholder { color:var(--muted); }
-  .review-fields textarea { min-height:88px; }
-
-  .submit-btn {
-    margin-top:4px; width:100%; padding:14px;
-    background:var(--amber); color:var(--ink);
-    font-family:'Syne',sans-serif; font-weight:700; font-size:1rem;
-    letter-spacing:.4px; border:none; border-radius:var(--radius-sm);
-    cursor:pointer; min-height:48px; transition:background .2s,transform .1s;
-  }
-  .submit-btn:hover  { background:var(--amber-light); }
-  .submit-btn:active { transform:scale(.98); }
-  .submit-btn:disabled { opacity:.6; cursor:not-allowed; }
-
-  .reviews-list { padding:18px 20px; flex:1; }
-  .review-card {
-    background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius); padding:14px 16px;
-    margin-bottom:10px; animation:slideIn .3s ease;
-  }
-  @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-  .review-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
-  .reviewer-name { font-family:'Syne',sans-serif; font-weight:600; font-size:.85rem; color:var(--paper); }
-  .review-meta   { font-size:.68rem; color:var(--muted); margin-top:2px; }
-  .review-stars  { display:flex; gap:2px; flex-shrink:0; }
-  .review-stars .s   { font-size:.8rem; }
-  .review-stars .s.f { color:var(--star-fill); }
-  .review-stars .s.e { color:var(--star-empty); }
-  .review-body   { font-size:.82rem; color:#c0bab2; line-height:1.55; }
-  .no-reviews    { text-align:center; padding:28px 16px; color:var(--muted); font-size:.82rem; font-style:italic; }
-  .no-reviews .icon { font-size:2rem; display:block; margin-bottom:8px; }
-
-  .panel-empty {
-    flex:1; display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
-    padding:28px; text-align:center; color:var(--muted);
-  }
-  .panel-empty .big-icon { font-size:2.8rem; margin-bottom:14px; opacity:.4; }
-  .panel-empty h3 { font-family:'Syne',sans-serif; font-size:1rem; color:var(--paper); margin-bottom:8px; }
-  .panel-empty p  { font-size:.82rem; line-height:1.5; }
-
-  /* ── TOAST ───────────────────────────────────────────────────────────────── */
-  .toast {
-    position:fixed; bottom:24px; left:50%;
-    transform:translateX(-50%) translateY(80px);
-    background:var(--green); color:#fff;
-    padding:12px 24px; border-radius:24px;
-    font-size:.88rem; font-weight:500; z-index:9999;
-    opacity:0; transition:transform .3s,opacity .3s;
-    box-shadow:0 6px 20px rgba(0,0,0,.45); white-space:nowrap;
-  }
-  .toast.show  { transform:translateX(-50%) translateY(0); opacity:1; }
-  .toast.error { background:var(--red); }
-
-  /* ── POPUP ───────────────────────────────────────────────────────────────── */
-  .leaflet-popup-content-wrapper {
-    background:var(--panel)!important; border:1px solid var(--panel-border)!important;
-    border-radius:var(--radius)!important; box-shadow:0 8px 32px rgba(0,0,0,.5)!important;
-    color:var(--paper)!important; font-family:'DM Sans',sans-serif!important;
-  }
-  .leaflet-popup-tip { background:var(--panel)!important; }
-  .leaflet-popup-content { margin:12px 16px!important; font-size:.82rem!important; }
-  .popup-addr   { font-family:'Syne',sans-serif; font-weight:600; font-size:.9rem; margin-bottom:4px; }
-  .popup-rating { color:var(--amber); font-size:.8rem; }
-  .popup-btn {
-    display:inline-flex; align-items:center; margin-top:10px;
-    padding:10px 16px; background:var(--amber); color:var(--ink);
-    font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem;
-    border-radius:6px; cursor:pointer; border:none;
-    min-height:44px; transition:background .2s;
-  }
-  .popup-btn:hover { background:var(--amber-light); }
-
-  .badge-good { color:var(--green); }
-  .badge-mid  { color:var(--amber); }
-  .badge-bad  { color:var(--red); }
-
-  /* ── RECENT REVIEWS (SEO section) ──────────────────────────────────────── */
-  #recent-reviews {
-    background:var(--panel); border-top:2px solid var(--panel-border);
-    padding:24px 16px 28px; flex-shrink:0;
-  }
-  .rr-header {
-    display:flex; align-items:baseline; justify-content:space-between;
-    gap:12px; margin-bottom:14px; flex-wrap:wrap;
-  }
-  .rr-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; color:var(--paper); }
-  .rr-subtitle { font-size:.7rem; color:var(--muted); }
-
-  #recent-reviews-list {
-    display:flex; gap:12px;
-    overflow-x:auto; scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;
-    padding-bottom:6px;
-  }
-  #recent-reviews-list::-webkit-scrollbar { height:3px; }
-  #recent-reviews-list::-webkit-scrollbar-thumb { background:var(--panel-border); border-radius:2px; }
-
+  /* SEO LIST */
+  #recent-reviews { background:var(--panel); padding:24px 16px; border-top:2px solid var(--panel-border); }
+  .rr-title { font-family:'Syne',sans-serif; font-size:1rem; margin-bottom:15px; }
+  #recent-reviews-list { display:flex; gap:12px; overflow-x:auto; padding-bottom:10px; }
   .rr-card {
-    background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius); padding:14px 15px;
-    min-width:220px; max-width:260px; flex-shrink:0;
-    scroll-snap-align:start; cursor:pointer;
-    transition:border-color .2s,transform .15s;
+    background:#242220; border:1px solid var(--panel-border); border-radius:var(--radius);
+    padding:14px; min-width:240px; flex-shrink:0;
   }
-  .rr-card:hover  { border-color:var(--amber); }
-  .rr-card:active { transform:scale(.98); }
-  .rr-card:focus  { outline:2px solid var(--amber); outline-offset:2px; }
-  .rr-top     { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
-  .rr-stars   { font-size:.85rem; letter-spacing:1px; }
-  .rr-date    { font-size:.62rem; color:var(--muted); }
-  .rr-building{ font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem; color:var(--paper); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .rr-addr    { font-size:.65rem; color:var(--muted); margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .rr-text    { font-size:.76rem; color:#c0bab2; line-height:1.5; margin-bottom:7px; }
-  .rr-author  { font-size:.68rem; color:var(--muted); font-style:italic; }
-  .rr-empty   { color:var(--muted); font-size:.82rem; font-style:italic; }
 
-  /* ── DESKTOP ─────────────────────────────────────────────────────────────── */
+  /* TABLET AND DESKTOP */
   @media (min-width:768px){
-    :root { --header-h:60px; }
-    header { padding:0 24px; gap:20px; }
-    .stat-label { display:inline; }
-    .app-body { flex-direction:row; height:calc(100vh - var(--header-h)); }
-    #map { height:auto; max-height:none; min-height:0; flex:1; }
-    #side-panel {
-      flex:none; width:0; border-top:none;
-      border-left:1px solid var(--panel-border);
-      transition:width .35s cubic-bezier(.4,0,.2,1);
-    }
-    #side-panel.open { width:420px; }
-    .panel-inner { width:420px; }
-    #recent-reviews { padding:28px 32px 36px; }
-    #recent-reviews-list { gap:16px; }
-    .rr-card { min-width:256px; max-width:300px; }
+    .app-body { flex-direction:row; height:calc(100vh - var(--header-h) - 40px); }
+    #map { height:auto; flex:1; }
+    #side-panel { width:400px; border-top:none; border-left:1px solid var(--panel-border); }
+    .seo-title { font-size: 1.1rem; }
   }
-  @media (min-width:1024px){
-    .search-wrap { max-width:520px; }
-    header { padding:0 28px; }
+
+  .toast {
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--green); padding:12px 24px; border-radius:24px; opacity:0; transition:0.3s;
   }
+  .toast.show { opacity:1; }
 </style>
 </head>
 <body>
@@ -715,52 +291,35 @@
 <header>
   <div class="logo"><span>home</span>resi</div>
   <div class="search-wrap">
-    <input type="text" id="search-input" placeholder="Search NYC buildings on homeresi..." autocomplete="off" aria-label="Search NYC buildings">
-    <button onclick="window._doSearch()" aria-label="Search">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    </button>
-    <div id="search-results" role="listbox" aria-label="Search suggestions"></div>
+    <input type="text" id="search-input" placeholder="Search buildings..." autocomplete="off">
+    <div id="search-results"></div>
   </div>
-  <div class="header-stats">
-    <div><strong id="stat-buildings">0</strong> <span class="stat-label">buildings</span></div>
-    <div><strong id="stat-reviews">0</strong> <span class="stat-label">reviews</span></div>
+  <div class="header-stats" style="font-size: 0.7rem; color: var(--muted);">
+    <strong id="stat-buildings" style="color:var(--amber)">0</strong> bldgs
   </div>
-  <a href="/about.html" style="color: white; text-decoration: none; margin-left: 15px; font-size: 0.85rem; font-family: 'Syne', sans-serif; font-weight: 600;">About Us</a>
-
 </header>
 
 <div class="app-body">
-  <div id="map" role="application" aria-label="NYC building map">
-    <div class="map-hint">📍 Tap anywhere to <span>add a building</span> &amp; review</div>
-  </div>
-  <div id="side-panel" role="complementary" aria-label="Building reviews panel">
+  <div id="map"></div>
+  <div id="side-panel">
     <div class="panel-inner" id="panel-inner">
-      <div class="panel-empty">
-        <div class="big-icon">🏙️</div>
+      <div style="text-align:center; padding:40px 0; color:var(--muted)">
         <h3>Select a building</h3>
-        <p>Tap a pin on the map or drop a new one to read and write tenant reviews.</p>
+        <p>Tap a pin to read reviews</p>
       </div>
     </div>
   </div>
 </div>
 
-<!-- SEO: crawlable reviews list -->
-<section id="recent-reviews" aria-label="Recent tenant reviews">
-  <div class="rr-header">
-    <h2 class="rr-title">Recent Reviews</h2>
-    <span class="rr-subtitle">Tap a card to open it on the map</span>
-  </div>
-  <div id="recent-reviews-list" role="list">
-    <p class="rr-empty">Loading reviews…</p>
-  </div>
+<section id="recent-reviews">
+  <h2 class="rr-title">Recent Reviews</h2>
+  <div id="recent-reviews-list"></div>
 </section>
-<footer style="padding: 20px; text-align: center; border-top: 1px solid #2e2c29; margin-top: 20px;">
-    <p style="font-size: 0.8rem; color: #7a7570; font-family: 'DM Sans', sans-serif;">
-        © 2026 Homeresi. All rights reserved. 
-        <a href="/privacy.html" style="color: #ff9800; text-decoration: none; margin-left: 10px; font-weight: 600;">Privacy Policy</a>
-    </p>
+
+<footer style="padding:20px; text-align:center; font-size:0.8rem; color:var(--muted);">
+  © 2026 Homeresi | <a href="/privacy.html" style="color:var(--amber); text-decoration:none;">Privacy</a>
 </footer>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="toast" class="toast"></div>
 </body>
 </html>
