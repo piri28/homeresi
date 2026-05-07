@@ -232,24 +232,46 @@
     btn.closest('.star-picker').querySelectorAll('.star-btn').forEach((b,i)=>b.classList.toggle('active',i<v));
   };
 
-  async function submitNewBuilding(lat,lng,address){
-    const rating=selectedRating['new']||0, name=document.getElementById('reviewer-name-new').value.trim()||'Anonymous', text=document.getElementById('reviewer-text-new').value.trim();
-    if(!rating){showToast('Please select a star rating',true);return;}
-    if(!text){showToast('Please write a review',true);return;}
-    const id='b'+Date.now(), review={author:name,rating,text,date:new Date().toISOString().slice(0,10)};
-    const building={id,lat,lng,address,name:address.split(',')[0],reviews:[review]};
-    const btn=document.getElementById('submit-new-btn');
-    btn.textContent='Saving…'; btn.disabled=true;
-    try{
+   // Slug creator (English chars only)
+  function createSlug(text) {
+    return text.toString().toLowerCase().trim()
+      .replace(/\s+/g, '-')           
+      .replace(/[^\w\-]+/g, '')       
+      .replace(/\-\-+/g, '-')         
+      .replace(/^-+/, '')             
+      .replace(/-+$/, '');            
+  }
+
+  async function submitNewBuilding(lat, lng, address) {
+    const rating = selectedRating['new'] || 0;
+    const name = document.getElementById('reviewer-name-new').value.trim() || 'Anonymous';
+    const text = document.getElementById('reviewer-text-new').value.trim();
+
+    if (!rating) { showToast('Please select a star rating', true); return; }
+    if (!text) { showToast('Please write a review', true); return; }
+
+    const buildingName = address.split(',')[0];
+    const slug = createSlug(buildingName);
+    const id = slug + '-' + Math.floor(1000 + Math.random() * 9000);
+    const review = { author: name, rating, text, date: new Date().toISOString().slice(0, 10) };
+
+    const building = { id, lat, lng, address, name: buildingName, reviews: [review] };
+    const btn = document.getElementById('submit-new-btn');
+    btn.textContent = 'Saving...'; btn.disabled = true;
+
+    try {
       await saveNewBuilding(building);
       delete selectedRating['new'];
-      if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
-      showToast('Building added & review posted! ✓'); openPanel(id);
-    }catch(err){
-      console.error(err); showToast('Failed to save — check Firestore rules',true);
-      btn.textContent='Add Building & Review'; btn.disabled=false;
+      if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+      showToast('Building added & review posted! ✓');
+      openPanel(id);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save', true);
+      btn.textContent = 'Add Building & Review'; btn.disabled = false;
     }
   }
+ 
 
   function renderPanel(b){
     const avg=avgRating(b), rc=b.reviews?b.reviews.length:0, dist=[0,0,0,0,0];
