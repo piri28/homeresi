@@ -322,7 +322,12 @@
           <div class="rr-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=r.rating?'#e8a020':'#3a3834'}">★</span>`).join('')}</div>
           <time class="rr-date" datetime="${r.date}">${formatDate(r.date)}</time>
         </div>
-        <div class="rr-building">${r.buildingName}</div>
+        <div class="rr-building">
+  <a href="/building/${r.buildingId}" style="text-decoration: none; color: inherit; font-weight: bold;">
+    ${r.buildingName}
+  </a>
+</div>
+
         <div class="rr-addr">${r.buildingAddr.split(',').slice(1,3).join(',').trim()}</div>
         <p class="rr-text">${r.text.length>120?r.text.slice(0,120)+'…':r.text}</p>
         <div class="rr-author">— ${r.author}</div>
@@ -685,6 +690,7 @@
 </style>
 </head>
 <body>
+<h1 class="seo-title">Homeresi: Real Tenant Reviews for NYC Apartments</h1>
 
 <header>
   <div class="logo"><span>home</span>resi</div>
