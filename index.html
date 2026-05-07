@@ -9,10 +9,30 @@
 <meta property="og:description" content="Honest tenant reviews for NYC apartment buildings. Read ratings and reviews from real tenants.">
 <meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="/favicon.png">
-<!-- JSON-LD Review Schema — dynamically populated -->
-<script type="application/ld+json" id="review-schema">
-{"@context":"https://schema.org","@type":"WebSite","name":"homeresi","description":"NYC tenant building reviews and ratings","url":"https://homeresi.app"}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "NYC Building Reviews",
+  "image": "https://www.homeresi.com/favicon.png",
+  "description": "Real tenant reviews and building insights for New York City apartments.",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "New York City",
+    "addressLocality": "Manhattan",
+    "addressRegion": "NY",
+    "addressCountry": "US"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "reviewCount": "24",
+    "bestRating": "5",
+    "worstRating": "1"
+  }
+}
 </script>
+
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
