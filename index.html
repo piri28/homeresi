@@ -735,6 +735,27 @@
     header { padding:0 28px; }
   }
 </style>
+      ...
+    }
+  </style>
+
+  <script>
+    (function() {
+      const currentPath = window.location.pathname;
+      if (currentPath === '/' || currentPath.includes('/building/')) {
+        var adsenseScript = document.createElement('script');
+        adsenseScript.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916189878783677";
+        adsenseScript.async = true;
+        adsenseScript.crossOrigin = "anonymous";
+        document.head.appendChild(adsenseScript);
+      }
+    })();
+  </script>
+
+</head>
+<body>
+    ...
+
 </head>
 <body>
 <h1 class="seo-title">Homeresi: Real Tenant Reviews for NYC Apartments</h1>
