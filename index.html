@@ -1,796 +1,440 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Homeresi — NYC Tenant Reviews & Apartment Ratings</title>
-<meta name="description" content="Honest tenant reviews for NYC apartment buildings. Read and write reviews, see star ratings, and find the best buildings in New York City.">
-<meta property="og:title" content="homeresi — NYC Tenant Reviews">
-<meta property="og:description" content="Honest tenant reviews for NYC apartment buildings. Read ratings and reviews from real tenants.">
-<meta property="og:type" content="website">
-<link rel="icon" type="image/png" href="/favicon.png">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "NYC Building Reviews",
-  "image": "https://www.homeresi.com/favicon.png",
-  "description": "Real tenant reviews and building insights for New York City apartments.",
-  "address": {
-    "@type": "PostalAddress",
-    "streetAddress": "New York City",
-    "addressLocality": "Manhattan",
-    "addressRegion": "NY",
-    "addressCountry": "US"
-  },
-  "aggregateRating": {
-    "@type": "AggregateRating",
-    "ratingValue": "4.8",
-    "reviewCount": "24",
-    "bestRating": "5",
-    "worstRating": "1"
-  }
-}
-</script>
-
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script type="module">
-  import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAnalytics }    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
-  import {
-    getFirestore, collection, doc,
-    setDoc, updateDoc, onSnapshot,
-    arrayUnion, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  // ── FIREBASE INIT ─────────────────────────────────────────────────────────
-  const firebaseConfig = {
-    apiKey:            "AIzaSyBHn_OIdaGtvIwHl-kKHv1URPWCdsC-ygc",
-    authDomain:        "homeresi.firebaseapp.com",
-    projectId:         "homeresi",
-    storageBucket:     "homeresi.firebasestorage.app",
-    messagingSenderId: "1044254777018",
-    appId:             "1:1044254777018:web:f01ebcffc70401b705ac83",
-    measurementId:     "G-VPQCCNTQZ7"
-  };
-  const app       = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-  const db        = getFirestore(app);
-  const BUILDINGS = collection(db, "buildings");
-
-  // ── IN-MEMORY CACHE ───────────────────────────────────────────────────────
-  const cache = {};
-
-  // ── MAP ───────────────────────────────────────────────────────────────────
-  const map = L.map('map', { center:[40.7128,-74.0060], zoom:13, zoomControl:true });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution:'© OpenStreetMap contributors', maxZoom:19
-  }).addTo(map);
-  const leafletMarkers = {};
-
-  // ── HELPERS ───────────────────────────────────────────────────────────────
-  const avgRating = b => (!b.reviews||!b.reviews.length) ? 0 : b.reviews.reduce((s,r)=>s+r.rating,0)/b.reviews.length;
-  const ratingColor = avg => avg>=4?'#2d7a4f':avg>=2.5?'#e8a020':'#c93030';
-  const starStr = n => [1,2,3,4,5].map(i=>i<=n?'★':'☆').join('');
-  const escHtml = s => s.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-  const formatDate = d => { try{return new Date(d).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});}catch{return d;} };
-
-  function showToast(msg, isError=false) {
-    const t=document.getElementById('toast');
-    t.textContent=msg; t.className='toast'+(isError?' error':'');
-    t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3200);
-  }
-
-  // ── MARKERS ───────────────────────────────────────────────────────────────
-  function createMarkerIcon(b) {
-    const avg=avgRating(b), hasR=b.reviews&&b.reviews.length;
-    const color=hasR?ratingColor(avg):'#e8a020', label=hasR?avg.toFixed(1):'+';
-    return L.divIcon({
-      className:'',
-      html:`<div style="width:38px;height:38px;background:${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #0f0e0d;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.5);cursor:pointer;"><span style="transform:rotate(45deg);font-size:11px;font-weight:800;color:#0f0e0d;font-family:'Syne',sans-serif;line-height:1">${label}</span></div>`,
-      iconSize:[38,38],iconAnchor:[19,38],popupAnchor:[0,-38]
-    });
-  }
-
-  function placeLeafletMarker(b) {
-    if(leafletMarkers[b.id]) map.removeLayer(leafletMarkers[b.id]);
-    const m=L.marker([b.lat,b.lng],{icon:createMarkerIcon(b)}).addTo(map);
-    const avg=avgRating(b), rc=b.reviews?b.reviews.length:0;
-    const rt=rc?`${starStr(Math.round(avg))} <strong>${avg.toFixed(1)}</strong> (${rc} review${rc!==1?'s':''})`:'No reviews yet';
-    m.bindPopup(`<div class="popup-addr">${b.name||b.address.split(',')[0]}</div>
-      <div style="font-size:.72rem;color:#7a7570;margin-bottom:4px">${b.address}</div>
-      <div class="popup-rating">${rt}</div>
-      <button class="popup-btn" onclick="window._openPanel('${b.id}')">Read Reviews →</button>`);
-    m.on('click',()=>openPanel(b.id));
-    leafletMarkers[b.id]=m;
-  }
-
-  // ── FIRESTORE LISTENER ────────────────────────────────────────────────────
-  onSnapshot(BUILDINGS, snap=>{
-    snap.docChanges().forEach(ch=>{
-      const d={id:ch.doc.id,...ch.doc.data()};
-      if(!d.reviews) d.reviews=[];
-      if(ch.type==='added'||ch.type==='modified'){
-        cache[d.id]=d; placeLeafletMarker(d);
-        if(ch.type==='modified'&&d.id===currentBuildingId){
-          renderPanel(d);
-          if(leafletMarkers[d.id]) leafletMarkers[d.id].setIcon(createMarkerIcon(d));
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homeresi — AI-Powered Tenant Risk Assessment</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-ink': '#0F1623',
+            'navy-deep': '#162035',
+            'gold-muted': '#B8965A',
+            'gold-light': '#D4AD72',
+            'cream-off': '#F5F2EC',
+            'steel-mid': '#4A5568',
+            'green-signal': '#2D6A4F',
+            'green-light': '#40916C',
+            'risk-red': '#9B2335',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'Georgia', 'serif'],
+            body: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
         }
       }
-      if(ch.type==='removed'){
-        delete cache[d.id];
-        if(leafletMarkers[d.id]){map.removeLayer(leafletMarkers[d.id]);delete leafletMarkers[d.id];}
-      }
-    });
-    updateStats(); renderRecentReviews(); updateSchemaMarkup();
-  }, err=>{ console.error(err); showToast('Could not connect to database',true); });
-
-  // ── FIRESTORE WRITES ──────────────────────────────────────────────────────
-  async function saveNewBuilding(b) {
-    await setDoc(doc(BUILDINGS,b.id),{lat:b.lat,lng:b.lng,address:b.address,name:b.name,reviews:b.reviews,createdAt:serverTimestamp()});
-  }
-  async function addReviewToBuilding(id,review) {
-    await updateDoc(doc(BUILDINGS,id),{reviews:arrayUnion(review)});
-  }
-
-  // ── MAP CLICK ─────────────────────────────────────────────────────────────
-  let tempMarker=null;
-  map.on('click', async e=>{
-    const {lat,lng}=e.latlng;
-    if(tempMarker) map.removeLayer(tempMarker);
-    tempMarker=L.marker([lat,lng],{icon:L.divIcon({className:'',
-      html:`<div style="width:20px;height:20px;background:#f5c84a;border-radius:50%;border:3px solid #0f0e0d;animation:pulse2 1s infinite"></div><style>@keyframes pulse2{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}</style>`,
-      iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map);
-    const address=await reverseGeocode(lat,lng);
-    openNewBuildingPanel(lat,lng,address);
-  });
-
-    async function reverseGeocode(lat, lng) {
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`);
-      const d = await r.json();
-      return d.display_name || `${lat.toFixed(5)},${lng.toFixed(5)}`;
-    } catch {
-      return `${lat.toFixed(5)},${lng.toFixed(5)}`;
     }
-  }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #0F1623; color: #F5F2EC; font-family: 'Inter', sans-serif; }
 
-  // ── SEARCH ────────────────────────────────────────────────────────────────
-  const searchInput=document.getElementById('search-input');
-  const searchResults=document.getElementById('search-results');
-  let st;
-  searchInput.addEventListener('input',()=>{
-    clearTimeout(st); const q=searchInput.value.trim();
-    if(q.length<3){searchResults.classList.remove('show');return;}
-    st=setTimeout(()=>doSearch(q),400);
-  });
-  searchInput.addEventListener('keydown',e=>{if(e.key==='Escape')searchResults.classList.remove('show');});
-  document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))searchResults.classList.remove('show');});
+    /* Hairline rule system */
+    .rule { border-top: 1px solid rgba(184,150,90,0.25); }
+    .rule-v { border-left: 1px solid rgba(184,150,90,0.18); }
 
-  async function doSearch(q){
-    q=q||searchInput.value.trim(); if(!q) return;
-    try{
-      const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+' New York City')}&limit=5&addressdetails=1`);
-      const res=await r.json();
-      searchResults.innerHTML=res.length
-        ?res.map(r=>`<div class="search-result-item" onclick="window._goToLocation(${r.lat},${r.lon},'${escHtml(r.display_name)}')"><div class="addr-main">${r.display_name.split(',')[0]}</div><div class="addr-sub">${r.display_name.split(',').slice(1,3).join(',')}</div></div>`).join('')
-        :'<div class="search-result-item"><div class="addr-main" style="color:#7a7570">No results found</div></div>';
-      searchResults.classList.add('show');
-    }catch{}
-  }
-  window._goToLocation=(lat,lng,addr)=>{map.flyTo([lat,lng],17,{duration:1.2});searchResults.classList.remove('show');searchInput.value=addr.split(',')[0];};
-  window._doSearch=doSearch;
-
-  // ── PANEL ─────────────────────────────────────────────────────────────────
-  const sidePanel=document.getElementById('side-panel');
-  const panelInner=document.getElementById('panel-inner');
-  let currentBuildingId=null;
-  const selectedRating={};
-
-  function openPanel(id){
-    currentBuildingId=id; const b=cache[id]; if(!b) return;
-    sidePanel.classList.add('open'); document.body.classList.add('panel-open');
-    renderPanel(b);
-    map.flyTo([b.lat,b.lng],Math.max(map.getZoom(),15),{duration:.8});
-    if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
-    // scroll recent-reviews into view on mobile if panel covers map
-    if(window.innerWidth<768) sidePanel.scrollIntoView({behavior:'smooth',block:'start'});
-  }
-  window._openPanel=openPanel;
-
-  function openNewBuildingPanel(lat,lng,address){
-    sidePanel.classList.add('open'); document.body.classList.add('panel-open');
-    panelInner.innerHTML=`
-      <div class="building-header">
-        <button class="close-btn" onclick="window._closePanel()" aria-label="Close">✕</button>
-        <div class="building-tag">📍 New Building</div>
-        <div class="building-name">${address.split(',')[0]}</div>
-        <div class="building-addr">${address.split(',').slice(1,3).join(',')}</div>
-      </div>
-      <div class="write-review">
-        <div class="section-title">Be the first to review</div>
-        <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Drop your honest experience for future tenants.</p>
-        <div class="star-picker" id="star-picker-new">
-          ${[1,2,3,4,5].map(i=>`<button class="star-btn" data-val="${i}" onclick="window._setRating(this,'new')" aria-label="${i} star">★</button>`).join('')}
-        </div>
-        <div class="review-fields">
-          <input type="text" id="reviewer-name-new" placeholder="Your name (e.g. J. Smith)" autocomplete="name">
-          <textarea id="reviewer-text-new" placeholder="Share your experience as a tenant…" rows="4"></textarea>
-          <button class="submit-btn" id="submit-new-btn">Add Building &amp; Review</button>
-        </div>
-      </div>`;
-    document.getElementById('submit-new-btn').addEventListener('click',()=>submitNewBuilding(lat,lng,address));
-  }
-
-  window._setRating=(btn,id)=>{
-    const v=parseInt(btn.dataset.val); selectedRating[id]=v;
-    btn.closest('.star-picker').querySelectorAll('.star-btn').forEach((b,i)=>b.classList.toggle('active',i<v));
-  };
-
-   // Slug creator (English chars only)
-  function createSlug(text) {
-    return text.toString().toLowerCase().trim()
-      .replace(/\s+/g, '-')           
-      .replace(/[^\w\-]+/g, '')       
-      .replace(/\-\-+/g, '-')         
-      .replace(/^-+/, '')             
-      .replace(/-+$/, '');            
-  }
-
-  async function submitNewBuilding(lat, lng, address) {
-    const rating = selectedRating['new'] || 0;
-    const name = document.getElementById('reviewer-name-new').value.trim() || 'Anonymous';
-    const text = document.getElementById('reviewer-text-new').value.trim();
-
-    if (!rating) { showToast('Please select a star rating', true); return; }
-    if (!text) { showToast('Please write a review', true); return; }
-
-    const buildingName = address.split(',')[0];
-    const slug = createSlug(buildingName);
-    const id = slug + '-' + Math.floor(1000 + Math.random() * 9000);
-    const review = { author: name, rating, text, date: new Date().toISOString().slice(0, 10) };
-
-    const building = { id, lat, lng, address, name: buildingName, reviews: [review] };
-    const btn = document.getElementById('submit-new-btn');
-    btn.textContent = 'Saving...'; btn.disabled = true;
-
-    try {
-      await saveNewBuilding(building);
-      delete selectedRating['new'];
-      if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
-      showToast('Building added & review posted! ✓');
-      openPanel(id);
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to save', true);
-      btn.textContent = 'Add Building & Review'; btn.disabled = false;
+    /* Score ring animation */
+    @keyframes scoreRing {
+      from { stroke-dashoffset: 220; }
+      to   { stroke-dashoffset: 44; }
     }
-  }
- 
+    .ring-fill { animation: scoreRing 1.6s cubic-bezier(.4,0,.2,1) forwards; animation-delay: 0.4s; }
 
-  function renderPanel(b){
-    const avg=avgRating(b), rc=b.reviews?b.reviews.length:0, dist=[0,0,0,0,0];
-    if(b.reviews) b.reviews.forEach(r=>{if(r.rating>=1&&r.rating<=5)dist[r.rating-1]++;});
-    panelInner.innerHTML=`
-      <div class="building-header">
-        <button class="close-btn" onclick="window._closePanel()" aria-label="Close">✕</button>
-        <div class="building-tag">🏢 Tenant Reviews</div>
-        <div class="building-name">${b.name||b.address.split(',')[0]}</div>
-        <div class="building-addr">${b.address}</div>
-        ${rc?`<div class="rating-summary">
-          <div class="rating-big ${avg>=4?'badge-good':avg>=2.5?'badge-mid':'badge-bad'}">${avg.toFixed(1)}</div>
-          <div class="rating-info">
-            <div class="stars-display">${[1,2,3,4,5].map(i=>`<span class="star-icon ${i<=Math.round(avg)?'filled':'empty'}">★</span>`).join('')}</div>
-            <div class="review-count">${rc} review${rc!==1?'s':''}</div>
-          </div></div>`:''}
-      </div>
-      ${rc?`<div class="rating-bars">${[5,4,3,2,1].map(s=>`
-        <div class="rating-bar-row">
-          <span class="label">${s}</span><span class="star-sm">★</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${rc?(dist[s-1]/rc*100):0}%"></div></div>
-          <span class="bar-count">${dist[s-1]}</span>
-        </div>`).join('')}</div>`:''}
-      <div class="write-review">
-        <div class="section-title">Write a Review</div>
-        <div class="star-picker" id="star-picker-${b.id}">
-          ${[1,2,3,4,5].map(i=>`<button class="star-btn" data-val="${i}" onclick="window._setRating(this,'${b.id}')" aria-label="${i} star">★</button>`).join('')}
-        </div>
-        <div class="review-fields">
-          <input type="text" id="reviewer-name-${b.id}" placeholder="Your name (e.g. J. Smith)" autocomplete="name">
-          <textarea id="reviewer-text-${b.id}" placeholder="Share your experience as a tenant…" rows="4"></textarea>
-          <button class="submit-btn" id="submit-review-btn-${b.id}">Post Review</button>
-        </div>
-      </div>
-      <div class="reviews-list">
-        <div class="section-title">${rc?`All Reviews (${rc})`:'No reviews yet'}</div>
-        ${rc?b.reviews.slice().reverse().map(r=>`
-          <div class="review-card">
-            <div class="review-card-header">
-              <div class="reviewer-info">
-                <div class="reviewer-name">${r.author}</div>
-                <div class="review-meta">${formatDate(r.date)}</div>
-              </div>
-              <div class="review-stars">${[1,2,3,4,5].map(i=>`<span class="s ${i<=r.rating?'f':'e'}">★</span>`).join('')}</div>
-            </div>
-            <div class="review-body">${r.text}</div>
-          </div>`).join('')
-          :`<div class="no-reviews"><span class="icon">✍️</span>Be the first to review this building.</div>`}
-      </div>`;
-    document.getElementById(`submit-review-btn-${b.id}`).addEventListener('click',()=>submitReview(b.id));
-  }
+    /* Subtle gold glow on cards */
+    .card-glow:hover { box-shadow: 0 0 0 1px rgba(184,150,90,0.35), 0 8px 32px rgba(184,150,90,0.08); transition: box-shadow 0.3s ease; }
 
-  async function submitReview(bid){
-    const rating=selectedRating[bid]||0, name=document.getElementById(`reviewer-name-${bid}`).value.trim()||'Anonymous', text=document.getElementById(`reviewer-text-${bid}`).value.trim();
-    if(!rating){showToast('Please select a star rating',true);return;}
-    if(!text){showToast('Please write a review',true);return;}
-    const review={author:name,rating,text,date:new Date().toISOString().slice(0,10)};
-    const btn=document.getElementById(`submit-review-btn-${bid}`);
-    btn.textContent='Saving…'; btn.disabled=true;
-    try{
-      await addReviewToBuilding(bid,review); delete selectedRating[bid]; showToast('Review posted! Thank you ✓');
-    }catch(err){
-      console.error(err); showToast('Failed to save — check Firestore rules',true);
-      btn.textContent='Post Review'; btn.disabled=false;
+    /* Badge pill */
+    .badge { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; }
+
+    /* Hero gradient overlay */
+    .hero-gradient { background: radial-gradient(ellipse 80% 60% at 60% 40%, rgba(22,32,53,0.6) 0%, rgba(15,22,35,0) 70%), linear-gradient(135deg, #0F1623 0%, #162035 100%); }
+
+    /* Trust score card */
+    .score-card { background: linear-gradient(145deg, #162035 0%, #0F1623 100%); border: 1px solid rgba(184,150,90,0.2); }
+
+    /* Step connector */
+    .step-line { background: linear-gradient(to bottom, rgba(184,150,90,0.5), rgba(184,150,90,0.1)); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ring-fill { animation: none; stroke-dashoffset: 44; }
     }
-  }
-
-  function closePanel(){
-    sidePanel.classList.remove('open'); document.body.classList.remove('panel-open');
-    currentBuildingId=null;
-    if(tempMarker){map.removeLayer(tempMarker);tempMarker=null;}
-    setTimeout(()=>{panelInner.innerHTML=`<div class="panel-empty"><div class="big-icon">🏙️</div><h3>Select a building</h3><p>Tap a pin on the map or drop a new one to read and write tenant reviews.</p></div>`;},350);
-  }
-  window._closePanel=closePanel;
-
-  // ── STATS ─────────────────────────────────────────────────────────────────
-  function updateStats(){
-    const bs=Object.values(cache);
-    document.getElementById('stat-buildings').textContent=bs.length;
-    document.getElementById('stat-reviews').textContent=bs.reduce((s,b)=>s+(b.reviews?b.reviews.length:0),0);
-  }
-
-  // ── SEO: RECENT REVIEWS ───────────────────────────────────────────────────
-  function renderRecentReviews(){
-    const el=document.getElementById('recent-reviews-list'); if(!el) return;
-    const all=[];
-    Object.values(cache).forEach(b=>(b.reviews||[]).forEach(r=>all.push({...r,buildingName:b.name||b.address.split(',')[0],buildingAddr:b.address,buildingId:b.id})));
-    all.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    const recent=all.slice(0,12);
-    if(!recent.length){el.innerHTML='<p class="rr-empty">No reviews yet — be the first!</p>';return;}
-    el.innerHTML=recent.map(r=>`
-      <article class="rr-card" onclick="window._openPanel('${r.buildingId}')" role="button" tabindex="0"
-        onkeydown="if(event.key==='Enter')window._openPanel('${r.buildingId}')">
-        <div class="rr-top">
-          <div class="rr-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=r.rating?'#e8a020':'#3a3834'}">★</span>`).join('')}</div>
-          <time class="rr-date" datetime="${r.date}">${formatDate(r.date)}</time>
-        </div>
-        <div class="rr-building">
-  <a href="/building/${r.buildingId}" style="text-decoration: none; color: inherit; font-weight: bold;">
-    ${r.buildingName}
-  </a>
-</div>
-
-        <div class="rr-addr">${r.buildingAddr.split(',').slice(1,3).join(',').trim()}</div>
-        <p class="rr-text">${r.text.length>120?r.text.slice(0,120)+'…':r.text}</p>
-        <div class="rr-author">— ${r.author}</div>
-      </article>`).join('');
-  }
-
-  // ── SEO: JSON-LD SCHEMA ───────────────────────────────────────────────────
-  function updateSchemaMarkup(){
-    const buildings=Object.values(cache).filter(b=>b.reviews&&b.reviews.length);
-    if(!buildings.length) return;
-    const schema={
-      "@context":"https://schema.org","@type":"ItemList",
-      "name":"homeresi — NYC Building Reviews",
-      "description":"Tenant reviews and star ratings for New York City apartment buildings",
-      "url":"https://homeresi.app",
-      "itemListElement":buildings.map((b,idx)=>({
-        "@type":"ListItem","position":idx+1,
-        "item":{
-          "@type":"LocalBusiness",
-          "name":b.name||b.address.split(',')[0],
-          "address":{"@type":"PostalAddress","streetAddress":b.address.split(',')[0],"addressLocality":"New York","addressRegion":"NY","addressCountry":"US"},
-          "aggregateRating":{"@type":"AggregateRating","ratingValue":avgRating(b).toFixed(1),"reviewCount":b.reviews.length,"bestRating":"5","worstRating":"1"},
-          "review":b.reviews.slice(-3).map(r=>({"@type":"Review","author":{"@type":"Person","name":r.author},"reviewRating":{"@type":"Rating","ratingValue":r.rating,"bestRating":"5"},"reviewBody":r.text,"datePublished":r.date}))
-        }
-      }))
-    };
-    document.getElementById('review-schema').textContent=JSON.stringify(schema,null,2);
-  }
-</script>
-
-<style>
-  :root {
-    --ink: #0f0e0d;
-    --paper: #f5f0e8;
-    --amber: #e8a020;
-    --amber-light: #f5c84a;
-    --red: #c93030;
-    --green: #2d7a4f;
-    --panel: #1a1916;
-    --panel-border: #2e2c29;
-    --muted: #7a7570;
-    --star-fill: #e8a020;
-    --star-empty: #3a3834;
-    --radius: 12px;
-    --radius-sm: 6px;
-    --header-h: 56px;
-  }
-
-  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html { font-size:16px; }
-
-  body {
-    font-family:'DM Sans',sans-serif;
-    background:var(--ink); color:var(--paper);
-    min-height:100vh; display:flex; flex-direction:column;
-    overflow-x:hidden;
-  }
-
-  /* ── HEADER ─────────────────────────────────────────────────────────────── */
-  header {
-    background:var(--panel); border-bottom:1px solid var(--panel-border);
-    padding:0 16px; height:var(--header-h);
-    display:flex; align-items:center; gap:12px;
-    position:sticky; top:0; z-index:1000; flex-shrink:0;
-  }
-  .logo {
-    font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem;
-    letter-spacing:-.5px; white-space:nowrap; flex-shrink:0;
-  }
-  .logo span { color:var(--amber); }
-
-  .search-wrap { flex:1; position:relative; min-width:0; }
-  .search-wrap input {
-    width:100%; background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius-sm); padding:11px 44px 11px 14px;
-    font-family:'DM Sans',sans-serif; font-size:1rem; /* 16px stops iOS zoom */
-    color:var(--paper); outline:none; transition:border-color .2s;
-    -webkit-appearance:none;
-  }
-  .search-wrap input::placeholder { color:var(--muted); }
-  .search-wrap input:focus { border-color:var(--amber); }
-  .search-wrap button {
-    position:absolute; right:0; top:0; bottom:0;
-    width:44px; background:none; border:none; cursor:pointer;
-    color:var(--muted); display:flex; align-items:center; justify-content:center;
-    transition:color .2s;
-  }
-  .search-wrap button:hover { color:var(--amber); }
-
-  #search-results {
-    position:absolute; top:calc(100% + 6px); left:0; right:0;
-    background:var(--panel); border:1px solid var(--panel-border);
-    border-radius:var(--radius-sm); overflow:hidden;
-    z-index:2000; display:none; box-shadow:0 8px 32px rgba(0,0,0,.5);
-  }
-  #search-results.show { display:block; }
-  .search-result-item {
-    padding:12px 14px; font-size:.85rem; cursor:pointer;
-    border-bottom:1px solid var(--panel-border); transition:background .15s;
-    min-height:48px; display:flex; flex-direction:column; justify-content:center;
-  }
-  .search-result-item:last-child { border-bottom:none; }
-  .search-result-item:hover,.search-result-item:active { background:#2a2826; }
-  .addr-main { color:var(--paper); font-weight:500; }
-  .addr-sub  { color:var(--muted); font-size:.72rem; margin-top:2px; }
-
-  .header-stats {
-    display:flex; gap:12px; font-size:.72rem; color:var(--muted); flex-shrink:0;
-  }
-  .header-stats strong { color:var(--amber); font-family:'Syne',sans-serif; font-size:.85rem; }
-  .stat-label { display:none; }
-
-  /* ── APP BODY ────────────────────────────────────────────────────────────── */
-  .app-body {
-    display:flex; flex-direction:column;
-    flex:1; overflow:hidden;
-  }
-
-  /* ── MAP ─────────────────────────────────────────────────────────────────── */
-  #map {
-    position:relative; cursor:crosshair;
-    /* Mobile: fixed height so panel is always reachable */
-    height:52vw; min-height:240px; max-height:400px;
-    flex-shrink:0;
-  }
-  .leaflet-tile { filter:brightness(.85) contrast(1.1) saturate(.8); }
-  .leaflet-control-zoom a {
-    background:var(--panel)!important; color:var(--paper)!important;
-    border-color:var(--panel-border)!important;
-    min-width:40px!important; min-height:40px!important;
-    line-height:40px!important; font-size:1.1rem!important;
-  }
-  .map-hint {
-    position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
-    background:rgba(15,14,13,.88); backdrop-filter:blur(8px);
-    border:1px solid var(--panel-border); border-radius:24px;
-    padding:8px 16px; font-size:.72rem; color:var(--muted);
-    z-index:500; pointer-events:none; white-space:nowrap;
-  }
-  .map-hint span { color:var(--amber); }
-
-  /* ── SIDE PANEL (mobile: below map; desktop: aside) ───────────────────── */
-  #side-panel {
-    flex:1; background:var(--panel);
-    border-top:1px solid var(--panel-border);
-    display:flex; flex-direction:column; overflow:hidden;
-  }
-  .panel-inner {
-    flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
-    display:flex; flex-direction:column;
-  }
-  .panel-inner::-webkit-scrollbar { width:4px; }
-  .panel-inner::-webkit-scrollbar-thumb { background:var(--panel-border); border-radius:2px; }
-
-  /* ── PANEL CONTENTS ────────────────────────────────────────────────────── */
-  .building-header {
-    padding:20px 20px 16px; border-bottom:1px solid var(--panel-border); position:relative;
-  }
-  .building-header .close-btn {
-    position:absolute; top:12px; right:12px;
-    background:#2a2826; border:1px solid var(--panel-border);
-    color:var(--muted); cursor:pointer; border-radius:50%;
-    width:44px; height:44px; font-size:1rem;
-    display:flex; align-items:center; justify-content:center;
-    transition:color .2s,background .2s;
-  }
-  .building-header .close-btn:hover { color:var(--paper); background:#3a3834; }
-
-  .building-tag {
-    font-size:.62rem; font-weight:600; letter-spacing:1.5px;
-    text-transform:uppercase; color:var(--amber); margin-bottom:5px;
-  }
-  .building-name {
-    font-family:'Syne',sans-serif; font-weight:700;
-    font-size:1.1rem; line-height:1.2; color:var(--paper); margin-bottom:4px;
-  }
-  .building-addr { font-size:.78rem; color:var(--muted); margin-bottom:14px; }
-
-  .rating-summary { display:flex; align-items:center; gap:12px; }
-  .rating-big { font-family:'Syne',sans-serif; font-size:2.4rem; font-weight:800; color:var(--amber); line-height:1; }
-  .rating-info { flex:1; }
-  .stars-display { display:flex; gap:3px; margin-bottom:4px; }
-  .star-icon { font-size:1rem; }
-  .star-icon.filled { color:var(--star-fill); }
-  .star-icon.empty  { color:var(--star-empty); }
-  .review-count { font-size:.72rem; color:var(--muted); }
-
-  .rating-bars { padding:0 20px 14px; border-bottom:1px solid var(--panel-border); margin-top:10px; }
-  .rating-bar-row { display:flex; align-items:center; gap:7px; margin-bottom:5px; font-size:.7rem; color:var(--muted); }
-  .rating-bar-row .label { width:8px; text-align:right; }
-  .rating-bar-row .star-sm { color:var(--amber); font-size:.62rem; }
-  .bar-track { flex:1; height:4px; background:var(--panel-border); border-radius:2px; overflow:hidden; }
-  .bar-fill  { height:100%; background:var(--amber); border-radius:2px; transition:width .6s cubic-bezier(.4,0,.2,1); }
-  .bar-count { width:20px; text-align:right; font-size:.68rem; }
-
-  .write-review { padding:18px 20px; border-bottom:1px solid var(--panel-border); }
-  .section-title { font-family:'Syne',sans-serif; font-weight:700; font-size:.85rem; letter-spacing:.4px; color:var(--paper); margin-bottom:12px; }
-
-  .star-picker { display:flex; gap:2px; margin-bottom:14px; }
-  .star-btn {
-    background:none; border:none; cursor:pointer;
-    font-size:2rem; color:var(--star-empty);
-    /* 44×44 minimum touch target */
-    min-width:44px; min-height:44px;
-    display:flex; align-items:center; justify-content:center;
-    transition:color .15s,transform .15s;
-  }
-  .star-btn:hover,.star-btn.active { color:var(--star-fill); }
-  .star-btn:hover { transform:scale(1.15); }
-
-  .review-fields { display:flex; flex-direction:column; gap:10px; }
-  .review-fields input,
-  .review-fields textarea {
-    background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius-sm); padding:13px 14px;
-    font-family:'DM Sans',sans-serif; font-size:1rem; /* no iOS zoom */
-    color:var(--paper); outline:none; resize:vertical;
-    transition:border-color .2s; -webkit-appearance:none;
-  }
-  .review-fields input:focus,.review-fields textarea:focus { border-color:var(--amber); }
-  .review-fields input::placeholder,.review-fields textarea::placeholder { color:var(--muted); }
-  .review-fields textarea { min-height:88px; }
-
-  .submit-btn {
-    margin-top:4px; width:100%; padding:14px;
-    background:var(--amber); color:var(--ink);
-    font-family:'Syne',sans-serif; font-weight:700; font-size:1rem;
-    letter-spacing:.4px; border:none; border-radius:var(--radius-sm);
-    cursor:pointer; min-height:48px; transition:background .2s,transform .1s;
-  }
-  .submit-btn:hover  { background:var(--amber-light); }
-  .submit-btn:active { transform:scale(.98); }
-  .submit-btn:disabled { opacity:.6; cursor:not-allowed; }
-
-  .reviews-list { padding:18px 20px; flex:1; }
-  .review-card {
-    background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius); padding:14px 16px;
-    margin-bottom:10px; animation:slideIn .3s ease;
-  }
-  @keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-  .review-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px; }
-  .reviewer-name { font-family:'Syne',sans-serif; font-weight:600; font-size:.85rem; color:var(--paper); }
-  .review-meta   { font-size:.68rem; color:var(--muted); margin-top:2px; }
-  .review-stars  { display:flex; gap:2px; flex-shrink:0; }
-  .review-stars .s   { font-size:.8rem; }
-  .review-stars .s.f { color:var(--star-fill); }
-  .review-stars .s.e { color:var(--star-empty); }
-  .review-body   { font-size:.82rem; color:#c0bab2; line-height:1.55; }
-  .no-reviews    { text-align:center; padding:28px 16px; color:var(--muted); font-size:.82rem; font-style:italic; }
-  .no-reviews .icon { font-size:2rem; display:block; margin-bottom:8px; }
-
-  .panel-empty {
-    flex:1; display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
-    padding:28px; text-align:center; color:var(--muted);
-  }
-  .panel-empty .big-icon { font-size:2.8rem; margin-bottom:14px; opacity:.4; }
-  .panel-empty h3 { font-family:'Syne',sans-serif; font-size:1rem; color:var(--paper); margin-bottom:8px; }
-  .panel-empty p  { font-size:.82rem; line-height:1.5; }
-
-  /* ── TOAST ───────────────────────────────────────────────────────────────── */
-  .toast {
-    position:fixed; bottom:24px; left:50%;
-    transform:translateX(-50%) translateY(80px);
-    background:var(--green); color:#fff;
-    padding:12px 24px; border-radius:24px;
-    font-size:.88rem; font-weight:500; z-index:9999;
-    opacity:0; transition:transform .3s,opacity .3s;
-    box-shadow:0 6px 20px rgba(0,0,0,.45); white-space:nowrap;
-  }
-  .toast.show  { transform:translateX(-50%) translateY(0); opacity:1; }
-  .toast.error { background:var(--red); }
-
-  /* ── POPUP ───────────────────────────────────────────────────────────────── */
-  .leaflet-popup-content-wrapper {
-    background:var(--panel)!important; border:1px solid var(--panel-border)!important;
-    border-radius:var(--radius)!important; box-shadow:0 8px 32px rgba(0,0,0,.5)!important;
-    color:var(--paper)!important; font-family:'DM Sans',sans-serif!important;
-  }
-  .leaflet-popup-tip { background:var(--panel)!important; }
-  .leaflet-popup-content { margin:12px 16px!important; font-size:.82rem!important; }
-  .popup-addr   { font-family:'Syne',sans-serif; font-weight:600; font-size:.9rem; margin-bottom:4px; }
-  .popup-rating { color:var(--amber); font-size:.8rem; }
-  .popup-btn {
-    display:inline-flex; align-items:center; margin-top:10px;
-    padding:10px 16px; background:var(--amber); color:var(--ink);
-    font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem;
-    border-radius:6px; cursor:pointer; border:none;
-    min-height:44px; transition:background .2s;
-  }
-  .popup-btn:hover { background:var(--amber-light); }
-
-  .badge-good { color:var(--green); }
-  .badge-mid  { color:var(--amber); }
-  .badge-bad  { color:var(--red); }
-
-  /* ── RECENT REVIEWS (SEO section) ──────────────────────────────────────── */
-  #recent-reviews {
-    background:var(--panel); border-top:2px solid var(--panel-border);
-    padding:24px 16px 28px; flex-shrink:0;
-  }
-  .rr-header {
-    display:flex; align-items:baseline; justify-content:space-between;
-    gap:12px; margin-bottom:14px; flex-wrap:wrap;
-  }
-  .rr-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; color:var(--paper); }
-  .rr-subtitle { font-size:.7rem; color:var(--muted); }
-
-  #recent-reviews-list {
-    display:flex; gap:12px;
-    overflow-x:auto; scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;
-    padding-bottom:6px;
-  }
-  #recent-reviews-list::-webkit-scrollbar { height:3px; }
-  #recent-reviews-list::-webkit-scrollbar-thumb { background:var(--panel-border); border-radius:2px; }
-
-  .rr-card {
-    background:#242220; border:1px solid var(--panel-border);
-    border-radius:var(--radius); padding:14px 15px;
-    min-width:220px; max-width:260px; flex-shrink:0;
-    scroll-snap-align:start; cursor:pointer;
-    transition:border-color .2s,transform .15s;
-  }
-  .rr-card:hover  { border-color:var(--amber); }
-  .rr-card:active { transform:scale(.98); }
-  .rr-card:focus  { outline:2px solid var(--amber); outline-offset:2px; }
-  .rr-top     { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
-  .rr-stars   { font-size:.85rem; letter-spacing:1px; }
-  .rr-date    { font-size:.62rem; color:var(--muted); }
-  .rr-building{ font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem; color:var(--paper); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .rr-addr    { font-size:.65rem; color:var(--muted); margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .rr-text    { font-size:.76rem; color:#c0bab2; line-height:1.5; margin-bottom:7px; }
-  .rr-author  { font-size:.68rem; color:var(--muted); font-style:italic; }
-  .rr-empty   { color:var(--muted); font-size:.82rem; font-style:italic; }
-
-  /* ── DESKTOP ─────────────────────────────────────────────────────────────── */
-  @media (min-width:768px){
-    :root { --header-h:60px; }
-    header { padding:0 24px; gap:20px; }
-    .stat-label { display:inline; }
-    .app-body { flex-direction:row; height:calc(100vh - var(--header-h)); }
-    #map { height:auto; max-height:none; min-height:0; flex:1; }
-    #side-panel {
-      flex:none; width:0; border-top:none;
-      border-left:1px solid var(--panel-border);
-      transition:width .35s cubic-bezier(.4,0,.2,1);
-    }
-    #side-panel.open { width:420px; }
-    .panel-inner { width:420px; }
-    #recent-reviews { padding:28px 32px 36px; }
-    #recent-reviews-list { gap:16px; }
-    .rr-card { min-width:256px; max-width:300px; }
-  }
-  @media (min-width:1024px){
-    .search-wrap { max-width:520px; }
-    header { padding:0 28px; }
-  }
-</style>
-   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916189878783677"
-     crossorigin="anonymous"></script>   
-
+  </style>
 </head>
-<body>
-<h1 class="seo-title">Homeresi: Real Tenant Reviews for NYC Apartments</h1>
+<body class="antialiased">
 
-<header>
-  <div class="logo"><span>home</span>resi</div>
-  <div class="search-wrap">
-    <input type="text" id="search-input" placeholder="Search NYC buildings on homeresi..." autocomplete="off" aria-label="Search NYC buildings">
-    <button onclick="window._doSearch()" aria-label="Search">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    </button>
-    <div id="search-results" role="listbox" aria-label="Search suggestions"></div>
-  </div>
-  <div class="header-stats">
-    <div><strong id="stat-buildings">0</strong> <span class="stat-label">buildings</span></div>
-    <div><strong id="stat-reviews">0</strong> <span class="stat-label">reviews</span></div>
-  </div>
-  <a href="/about.html" style="color: white; text-decoration: none; margin-left: 15px; font-size: 0.85rem; font-family: 'Syne', sans-serif; font-weight: 600;">About Us</a>
-
-</header>
-
-<div class="app-body">
-  <div id="map" role="application" aria-label="NYC building map">
-    <div class="map-hint">📍 Tap anywhere to <span>add a building</span> &amp; review</div>
-  </div>
-  <div id="side-panel" role="complementary" aria-label="Building reviews panel">
-    <div class="panel-inner" id="panel-inner">
-      <div class="panel-empty">
-        <div class="big-icon">🏙️</div>
-        <h3>Select a building</h3>
-        <p>Tap a pin on the map or drop a new one to read and write tenant reviews.</p>
+  <!-- ═══════════════════ NAV ═══════════════════ -->
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-ink/90 backdrop-blur-md rule">
+    <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
+      <div class="flex items-center gap-3">
+        <span class="text-gold-muted font-display font-700 text-xl tracking-tight">Homeresi</span>
+        <span class="badge text-gold-muted bg-gold-muted/10 px-2 py-0.5 rounded">AI Screening</span>
+      </div>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#how-it-works" class="text-sm text-cream-off/60 hover:text-cream-off transition-colors">How It Works</a>
+        <a href="#trust-score" class="text-sm text-cream-off/60 hover:text-cream-off transition-colors">Trust Score</a>
+        <a href="#pricing" class="text-sm text-cream-off/60 hover:text-cream-off transition-colors">Pricing</a>
+        <a href="homeresi-form.html" class="bg-gold-muted hover:bg-gold-light text-slate-ink text-sm font-semibold px-5 py-2 rounded transition-colors">Screen a Tenant</a>
       </div>
     </div>
-  </div>
-</div>
+  </nav>
 
-<!-- SEO: crawlable reviews list -->
-<section id="recent-reviews" aria-label="Recent tenant reviews">
-  <div class="rr-header">
-    <h2 class="rr-title">Recent Reviews</h2>
-    <span class="rr-subtitle">Tap a card to open it on the map</span>
-  </div>
-  <div id="recent-reviews-list" role="list">
-    <p class="rr-empty">Loading reviews…</p>
-  </div>
-</section>
-<footer style="padding: 20px; text-align: center; border-top: 1px solid #2e2c29; margin-top: 20px;">
-    <p style="font-size: 0.8rem; color: #7a7570; font-family: 'DM Sans', sans-serif;">
-        © 2026 Homeresi. All rights reserved. 
-        <a href="/privacy.html" style="color: #ff9800; text-decoration: none; margin-left: 10px; font-weight: 600;">Privacy Policy</a>
-    </p>
-</footer>
+  <!-- ═══════════════════ HERO ═══════════════════ -->
+  <section class="hero-gradient min-h-screen flex items-center pt-16">
+    <div class="max-w-6xl mx-auto px-6 py-24 grid md:grid-cols-2 gap-16 items-center">
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <!-- Left: Copy -->
+      <div>
+        <p class="badge text-gold-muted mb-6 tracking-widest">Premium Property Protection</p>
+        <h1 class="font-display text-4xl md:text-5xl lg:text-6xl font-700 leading-tight text-cream-off mb-6">
+          Protect Your<br/>
+          <span class="text-gold-muted">Property Investment.</span><br/>
+          Screen Tenants with<br/>AI-Driven Risk Analysis.
+        </h1>
+        <p class="text-cream-off/70 text-lg leading-relaxed mb-8 max-w-md">
+          Avoid lawsuit risks and problematic tenants before signing the lease.
+          Homeresi surfaces financial sustainability, legal exposure, and behavioural risk
+          signals — so you lease with confidence.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-10">
+          <a href="homeresi-form.html"
+            class="inline-flex items-center justify-center gap-2 bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-7 py-4 rounded transition-colors text-sm tracking-wide">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            Start Tenant Screening — Pay-Per-Use
+          </a>
+          <a href="#trust-score" class="inline-flex items-center justify-center gap-2 border border-gold-muted/40 text-gold-muted hover:border-gold-muted text-sm font-medium px-7 py-4 rounded transition-colors">
+            See Sample Report
+          </a>
+        </div>
+
+        <!-- Social proof row -->
+        <div class="rule pt-6 flex items-center gap-6 flex-wrap">
+          <div>
+            <p class="font-display text-2xl font-600 text-cream-off">98.2%</p>
+            <p class="text-cream-off/50 text-xs mt-0.5">Report accuracy rate</p>
+          </div>
+          <div class="rule-v h-10"></div>
+          <div>
+            <p class="font-display text-2xl font-600 text-cream-off">4 hrs</p>
+            <p class="text-cream-off/50 text-xs mt-0.5">Average report delivery</p>
+          </div>
+          <div class="rule-v h-10"></div>
+          <div>
+            <p class="font-display text-2xl font-600 text-cream-off">Human-in-the-Loop</p>
+            <p class="text-cream-off/50 text-xs mt-0.5">Expert verified, every time</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Trust Score Preview -->
+      <div id="trust-score" class="score-card rounded-2xl p-8 card-glow relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-40 h-40 bg-gold-muted/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+        <p class="badge text-gold-muted mb-4">Sample Homeresi Trust Score Report</p>
+        <div class="flex items-center gap-6 mb-6">
+          <!-- SVG Score Ring -->
+          <div class="relative w-28 h-28 flex-shrink-0">
+            <svg viewBox="0 0 80 80" class="w-full h-full -rotate-90">
+              <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(184,150,90,0.15)" stroke-width="6"/>
+              <circle cx="40" cy="40" r="35" fill="none" stroke="#B8965A" stroke-width="6"
+                stroke-dasharray="220" stroke-dashoffset="220" stroke-linecap="round"
+                class="ring-fill"/>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="font-display text-2xl font-700 text-gold-muted">82</span>
+              <span class="text-cream-off/40 text-xs">/100</span>
+            </div>
+          </div>
+          <div>
+            <h3 class="font-display text-xl text-cream-off font-600">J. Monteiro</h3>
+            <p class="text-cream-off/50 text-sm mb-2">Applicant · Unit 14A, Bosphorus Residences</p>
+            <span class="badge bg-green-signal/20 text-green-light px-3 py-1 rounded-full">LOW RISK — Recommended</span>
+          </div>
+        </div>
+
+        <!-- Mini breakdown -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/60 text-sm">Financial Sustainability</span>
+            <div class="flex items-center gap-2">
+              <div class="w-24 h-1.5 bg-cream-off/10 rounded-full overflow-hidden">
+                <div class="h-full bg-green-light rounded-full" style="width:88%"></div>
+              </div>
+              <span class="font-mono text-xs text-green-light">88</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/60 text-sm">Legal Background</span>
+            <div class="flex items-center gap-2">
+              <div class="w-24 h-1.5 bg-cream-off/10 rounded-full overflow-hidden">
+                <div class="h-full bg-green-light rounded-full" style="width:95%"></div>
+              </div>
+              <span class="font-mono text-xs text-green-light">95</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/60 text-sm">Rental History Risk</span>
+            <div class="flex items-center gap-2">
+              <div class="w-24 h-1.5 bg-cream-off/10 rounded-full overflow-hidden">
+                <div class="h-full bg-gold-muted rounded-full" style="width:68%"></div>
+              </div>
+              <span class="font-mono text-xs text-gold-muted">68</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/60 text-sm">Behavioural Signals</span>
+            <div class="flex items-center gap-2">
+              <div class="w-24 h-1.5 bg-cream-off/10 rounded-full overflow-hidden">
+                <div class="h-full bg-green-light rounded-full" style="width:80%"></div>
+              </div>
+              <span class="font-mono text-xs text-green-light">80</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rule mt-5 pt-4 flex items-center justify-between">
+          <span class="text-cream-off/40 text-xs">PDF Report · Verified by Human Analyst</span>
+          <span class="badge text-gold-muted">Confidential</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
+  <section id="how-it-works" class="py-28 bg-navy-deep">
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="text-center mb-20">
+        <p class="badge text-gold-muted mb-4 tracking-widest">Simple. Thorough. Fast.</p>
+        <h2 class="font-display text-4xl md:text-5xl text-cream-off font-700">How It Works</h2>
+        <p class="text-cream-off/50 mt-4 max-w-lg mx-auto">Three steps from applicant details to a full risk-assessed PDF report — all without legal exposure to you.</p>
+      </div>
+
+      <div class="relative">
+        <!-- Vertical connector line (desktop) -->
+        <div class="hidden md:block absolute left-[calc(33.33%-1px)] top-16 bottom-16 w-px step-line"></div>
+        <div class="hidden md:block absolute left-[calc(66.66%-1px)] top-16 bottom-16 w-px step-line"></div>
+
+        <div class="grid md:grid-cols-3 gap-8">
+
+          <!-- Step 1 -->
+          <div class="score-card rounded-xl p-8 card-glow group">
+            <div class="w-10 h-10 rounded-full border border-gold-muted/40 flex items-center justify-center mb-6 group-hover:border-gold-muted transition-colors">
+              <span class="font-mono text-gold-muted text-sm font-500">01</span>
+            </div>
+            <div class="w-10 h-10 mb-5 text-gold-muted">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+              </svg>
+            </div>
+            <h3 class="font-display text-xl text-cream-off font-600 mb-3">Submit Applicant Details</h3>
+            <p class="text-cream-off/55 text-sm leading-relaxed">Provide basic tenant information — name, contact, employment, and rental history references. No special technical knowledge required. Takes under five minutes.</p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="score-card rounded-xl p-8 card-glow group">
+            <div class="w-10 h-10 rounded-full border border-gold-muted/40 flex items-center justify-center mb-6 group-hover:border-gold-muted transition-colors">
+              <span class="font-mono text-gold-muted text-sm font-500">02</span>
+            </div>
+            <div class="w-10 h-10 mb-5 text-gold-muted">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+            </div>
+            <h3 class="font-display text-xl text-cream-off font-600 mb-3">AI Analysis + Human Verification</h3>
+            <p class="text-cream-off/55 text-sm leading-relaxed">Our AI engine cross-references financial sustainability signals, public legal records, and rental risk patterns. Every report is reviewed by a human analyst before delivery.</p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="score-card rounded-xl p-8 card-glow group">
+            <div class="w-10 h-10 rounded-full border border-gold-muted/40 flex items-center justify-center mb-6 group-hover:border-gold-muted transition-colors">
+              <span class="font-mono text-gold-muted text-sm font-500">03</span>
+            </div>
+            <div class="w-10 h-10 mb-5 text-gold-muted">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </div>
+            <h3 class="font-display text-xl text-cream-off font-600 mb-3">Receive Your Trust Score Report</h3>
+            <p class="text-cream-off/55 text-sm leading-relaxed">Get a comprehensive PDF 'Homeresi Trust Score Report' within hours — covering risk scores, red flags, and a clear recommendation. Yours to review privately.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FEATURES / WHY ═══════════════════ -->
+  <section class="py-24 bg-slate-ink">
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="grid md:grid-cols-2 gap-16 items-center">
+        <div>
+          <p class="badge text-gold-muted mb-4 tracking-widest">Built for Premium Landlords</p>
+          <h2 class="font-display text-3xl md:text-4xl text-cream-off font-700 mb-6">
+            High-value properties deserve a higher standard of due diligence.
+          </h2>
+          <p class="text-cream-off/60 leading-relaxed mb-8">
+            Standard rental checks miss the signals that matter for premium properties.
+            Homeresi was built specifically for landlords whose portfolio risk is too high to leave to a form and a credit bureau.
+          </p>
+          <ul class="space-y-4">
+            <li class="flex items-start gap-3">
+              <div class="w-5 h-5 flex-shrink-0 mt-0.5 text-gold-muted">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+              </div>
+              <p class="text-cream-off/70 text-sm leading-relaxed"><strong class="text-cream-off">Public legal background sweep</strong> — court records, eviction filings, and dispute history surfaced and summarised.</p>
+            </li>
+            <li class="flex items-start gap-3">
+              <div class="w-5 h-5 flex-shrink-0 mt-0.5 text-gold-muted">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+              </div>
+              <p class="text-cream-off/70 text-sm leading-relaxed"><strong class="text-cream-off">Financial sustainability modelling</strong> — rent-to-income ratios, stability indicators, and liability signals.</p>
+            </li>
+            <li class="flex items-start gap-3">
+              <div class="w-5 h-5 flex-shrink-0 mt-0.5 text-gold-muted">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+              </div>
+              <p class="text-cream-off/70 text-sm leading-relaxed"><strong class="text-cream-off">No subscription lock-in</strong> — pay per screening. Use only when you need it.</p>
+            </li>
+            <li class="flex items-start gap-3">
+              <div class="w-5 h-5 flex-shrink-0 mt-0.5 text-gold-muted">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+              </div>
+              <p class="text-cream-off/70 text-sm leading-relaxed"><strong class="text-cream-off">Strictly confidential</strong> — reports are delivered securely to you. Applicant data is never resold.</p>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Risk tier visual -->
+        <div class="score-card rounded-2xl p-8 space-y-4">
+          <p class="badge text-gold-muted mb-2">Risk Tier Overview</p>
+          <div class="flex items-center gap-4 p-4 bg-green-signal/10 border border-green-signal/20 rounded-lg">
+            <div class="w-3 h-3 rounded-full bg-green-light flex-shrink-0"></div>
+            <div>
+              <p class="text-cream-off text-sm font-500">Low Risk — Score 75–100</p>
+              <p class="text-cream-off/50 text-xs mt-0.5">Strong financials, clean record. Recommended for approval.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 p-4 bg-gold-muted/10 border border-gold-muted/20 rounded-lg">
+            <div class="w-3 h-3 rounded-full bg-gold-muted flex-shrink-0"></div>
+            <div>
+              <p class="text-cream-off text-sm font-500">Moderate Risk — Score 50–74</p>
+              <p class="text-cream-off/50 text-xs mt-0.5">Some flags noted. Additional verification recommended before proceeding.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 p-4 bg-risk-red/10 border border-risk-red/20 rounded-lg">
+            <div class="w-3 h-3 rounded-full bg-risk-red flex-shrink-0"></div>
+            <div>
+              <p class="text-cream-off text-sm font-500">High Risk — Score 0–49</p>
+              <p class="text-cream-off/50 text-xs mt-0.5">Material concerns identified. Leasing not advised without further legal review.</p>
+            </div>
+          </div>
+          <div class="rule pt-4">
+            <p class="text-cream-off/40 text-xs">All tier classifications based on multi-factor AI analysis + human analyst review.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ PRICING ═══════════════════ -->
+  <section id="pricing" class="py-24 bg-navy-deep">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+      <p class="badge text-gold-muted mb-4 tracking-widest">Transparent Pricing</p>
+      <h2 class="font-display text-4xl text-cream-off font-700 mb-4">Pay Only When You Screen</h2>
+      <p class="text-cream-off/50 mb-14 max-w-md mx-auto">No monthly fee. No seat licences. One applicant, one report, one payment.</p>
+
+      <div class="score-card rounded-2xl p-10 max-w-md mx-auto card-glow">
+        <p class="badge text-gold-muted mb-4">Per Report</p>
+        <p class="font-display text-6xl font-700 text-cream-off mb-1">$49</p>
+        <p class="text-cream-off/50 text-sm mb-8">per tenant screening</p>
+        <ul class="text-left space-y-3 mb-10">
+          <li class="flex items-center gap-3 text-cream-off/70 text-sm"><span class="text-gold-muted">✓</span> Full Homeresi Trust Score PDF Report</li>
+          <li class="flex items-center gap-3 text-cream-off/70 text-sm"><span class="text-gold-muted">✓</span> AI analysis + human analyst review</li>
+          <li class="flex items-center gap-3 text-cream-off/70 text-sm"><span class="text-gold-muted">✓</span> Financial, legal, and rental risk breakdown</li>
+          <li class="flex items-center gap-3 text-cream-off/70 text-sm"><span class="text-gold-muted">✓</span> Delivered securely within 4 hours</li>
+          <li class="flex items-center gap-3 text-cream-off/70 text-sm"><span class="text-gold-muted">✓</span> No subscription required</li>
+        </ul>
+        <a href="homeresi-form.html" class="block w-full text-center bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-6 py-4 rounded transition-colors">
+          Start Tenant Screening — Pay-Per-Use
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CTA BANNER ═══════════════════ -->
+  <section class="py-20 bg-slate-ink rule">
+    <div class="max-w-3xl mx-auto px-6 text-center">
+      <h2 class="font-display text-3xl md:text-4xl text-cream-off font-700 mb-5">
+        Before you sign the lease —<br/>
+        <span class="text-gold-muted">know who you're trusting with your property.</span>
+      </h2>
+      <p class="text-cream-off/55 mb-8">One report. Four hours. The clarity to make the right decision.</p>
+      <a href="homeresi-form.html" class="inline-flex items-center gap-2 bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-8 py-4 rounded transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Start Tenant Screening — Pay-Per-Use
+      </a>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FOOTER + DISCLAIMER ═══════════════════ -->
+  <footer class="bg-navy-deep rule py-12">
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="flex flex-col md:flex-row justify-between items-start gap-8 mb-10">
+        <div>
+          <span class="font-display text-lg text-cream-off font-600">Homeresi</span>
+          <p class="text-cream-off/40 text-sm mt-2 max-w-xs">AI-Powered Tenant Risk Assessment & Screening for Premium Landlords.</p>
+        </div>
+        <div class="flex gap-12 text-sm text-cream-off/50">
+          <div>
+            <p class="text-cream-off/30 text-xs badge mb-3">Platform</p>
+            <ul class="space-y-2">
+              <li><a href="#how-it-works" class="hover:text-cream-off/80 transition-colors">How It Works</a></li>
+              <li><a href="#pricing" class="hover:text-cream-off/80 transition-colors">Pricing</a></li>
+              <li><a href="#trust-score" class="hover:text-cream-off/80 transition-colors">Sample Report</a></li>
+            </ul>
+          </div>
+          <div>
+            <p class="text-cream-off/30 text-xs badge mb-3">Legal</p>
+            <ul class="space-y-2">
+              <li><a href="#" class="hover:text-cream-off/80 transition-colors">Privacy Policy</a></li>
+              <li><a href="#" class="hover:text-cream-off/80 transition-colors">Terms of Service</a></li>
+              <li><a href="#" class="hover:text-cream-off/80 transition-colors">Contact</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legal Disclaimer -->
+      <div class="rule pt-8">
+        <div class="bg-cream-off/5 border border-cream-off/10 rounded-lg p-5 mb-6">
+          <p class="badge text-cream-off/40 mb-2">Legal Disclaimer</p>
+          <p class="text-cream-off/45 text-xs leading-relaxed">
+            Homeresi Trust Score Reports are provided solely for informational and advisory purposes. All reports constitute
+            risk assessment guidance based on publicly available data and AI-assisted analysis, supplemented by independent
+            human analyst review. Reports do not constitute legal, financial, or professional advice. Homeresi makes no
+            representations or warranties, express or implied, regarding the completeness, accuracy, or fitness for purpose
+            of any report. Landlords and property owners bear sole responsibility for all leasing decisions made in connection
+            with or following any Homeresi report. <strong class="text-cream-off/55">Homeresi bears no legal liability
+            whatsoever for any future lease disputes, tenant conduct, property damage, financial loss, or legal proceedings
+            arising from or related to any tenancy entered into following a Homeresi screening report.</strong> Use of
+            Homeresi services constitutes acceptance of these terms. Landlords are advised to seek independent legal counsel
+            before entering into any lease agreement.
+          </p>
+        </div>
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-cream-off/30 text-xs">
+          <p>© 2025 Homeresi. All rights reserved.</p>
+          <p>Advisory risk assessments only. Not a substitute for independent legal advice.</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
 </body>
 </html>

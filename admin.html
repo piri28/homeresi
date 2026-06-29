@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homeresi — Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-ink':    '#0F1623',
+            'navy-deep':    '#162035',
+            'navy-card':    '#1C2A42',
+            'navy-row':     '#19273D',
+            'gold-muted':   '#B8965A',
+            'gold-light':   '#D4AD72',
+            'cream-off':    '#F5F2EC',
+            'green-signal': '#2D6A4F',
+            'green-light':  '#40916C',
+            'risk-red':     '#9B2335',
+            'amber-mid':    '#92610A',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'Georgia', 'serif'],
+            body:    ['Inter', 'system-ui', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #0F1623; color: #F5F2EC; font-family: 'Inter', sans-serif; }
+
+    .badge { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.11em; text-transform: uppercase; }
+    .rule  { border-top: 1px solid rgba(184,150,90,0.15); }
+
+    /* Table row hover */
+    .trow { transition: background 0.15s ease; }
+    .trow:hover > td { background: rgba(184,150,90,0.04); }
+
+    /* Expanded detail panel */
+    .detail-panel { display: none; }
+    .detail-panel.open { display: table-row; }
+
+    /* Copy button flash */
+    .copy-btn { transition: all 0.15s; }
+    .copy-btn.copied { background: rgba(45,106,79,0.25); border-color: rgba(64,145,108,0.5); color: #40916C; }
+
+    /* Status badges */
+    .st-pending   { background: rgba(146,97,10,0.18);  color: #D4AD72; border: 1px solid rgba(146,97,10,0.35); }
+    .st-analyzing { background: rgba(184,150,90,0.12); color: #B8965A; border: 1px solid rgba(184,150,90,0.3); }
+    .st-ready     { background: rgba(45,106,79,0.18);  color: #40916C; border: 1px solid rgba(45,106,79,0.35); }
+
+    /* Stat card */
+    .stat-card { background: linear-gradient(145deg, #162035 0%, #0F1623 100%); border: 1px solid rgba(184,150,90,0.16); border-radius: 0.875rem; }
+
+    /* Sidebar */
+    .sidebar-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; border-radius: 0.5rem; font-size: 0.82rem; color: rgba(245,242,236,0.45); transition: all 0.15s; }
+    .sidebar-link:hover   { background: rgba(184,150,90,0.08); color: rgba(245,242,236,0.8); }
+    .sidebar-link.active  { background: rgba(184,150,90,0.12); color: #D4AD72; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0F1623; }
+    ::-webkit-scrollbar-thumb { background: rgba(184,150,90,0.25); border-radius: 3px; }
+
+    /* Filter chip */
+    .filter-chip { padding: 0.35rem 0.9rem; border-radius: 999px; font-size: 0.75rem; border: 1px solid rgba(184,150,90,0.2); color: rgba(245,242,236,0.45); background: transparent; cursor: pointer; transition: all 0.15s; }
+    .filter-chip.active, .filter-chip:hover { border-color: #B8965A; color: #D4AD72; background: rgba(184,150,90,0.1); }
+
+    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .detail-inner { animation: fadeSlide 0.2s ease; }
+  </style>
+</head>
+<body class="antialiased min-h-screen flex">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="w-56 flex-shrink-0 bg-navy-deep border-r border-gold-muted/12 flex flex-col fixed h-full z-30 hidden lg:flex">
+    <div class="px-5 py-5 rule mb-2">
+      <span class="font-display text-lg text-gold-muted font-600 tracking-tight">Homeresi</span>
+      <p class="badge text-cream-off/25 mt-0.5">Admin Panel</p>
+    </div>
+    <nav class="px-3 space-y-0.5 flex-1">
+      <a href="#" class="sidebar-link active">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        All Requests
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Reports Issued
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        Landlords
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+        Settings
+      </a>
+    </nav>
+    <div class="px-4 py-4 rule">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-gold-muted/20 flex items-center justify-center text-gold-muted text-xs font-mono">A</div>
+        <div>
+          <p class="text-cream-off text-xs font-500">Admin</p>
+          <p class="text-cream-off/30 text-xs">admin@homeresi.com</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════ MAIN ══════════ -->
+  <div class="lg:ml-56 flex-1 flex flex-col min-h-screen">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-20 bg-slate-ink/90 backdrop-blur-md border-b border-gold-muted/12 px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-xl text-cream-off font-600">Screening Requests</h1>
+        <p class="text-cream-off/35 text-xs mt-0.5">Last updated: <span id="lastUpdated"></span></p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1.5 text-xs text-green-light bg-green-signal/15 border border-green-signal/25 px-3 py-1.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-light inline-block animate-pulse"></span>
+          Live
+        </span>
+        <a href="homeresi-form.html" class="bg-gold-muted hover:bg-gold-light text-slate-ink text-xs font-semibold px-4 py-2 rounded-lg transition-colors inline-block">
+          + New Request
+        </a>
+      </div>
+    </header>
+
+    <main class="flex-1 p-6">
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="stat-card p-5">
+          <p class="badge text-cream-off/30 mb-2">Total Requests</p>
+          <p class="font-display text-3xl text-cream-off font-700">12</p>
+          <p class="text-cream-off/35 text-xs mt-1">All time</p>
+        </div>
+        <div class="stat-card p-5">
+          <p class="badge text-amber-mid mb-2">Pending</p>
+          <p class="font-display text-3xl text-gold-light font-700">4</p>
+          <p class="text-cream-off/35 text-xs mt-1">Awaiting analysis</p>
+        </div>
+        <div class="stat-card p-5">
+          <p class="badge text-gold-muted mb-2">Analyzing</p>
+          <p class="font-display text-3xl text-gold-muted font-700">3</p>
+          <p class="text-cream-off/35 text-xs mt-1">In progress</p>
+        </div>
+        <div class="stat-card p-5">
+          <p class="badge text-green-light mb-2">Reports Ready</p>
+          <p class="font-display text-3xl text-green-light font-700">5</p>
+          <p class="text-cream-off/35 text-xs mt-1">Delivered</p>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div class="flex gap-2 flex-wrap" id="filterBar">
+          <button class="filter-chip active" onclick="filterTable('all', this)">All</button>
+          <button class="filter-chip" onclick="filterTable('Pending', this)">Pending</button>
+          <button class="filter-chip" onclick="filterTable('Analyzing', this)">Analyzing</button>
+          <button class="filter-chip" onclick="filterTable('Report Ready', this)">Report Ready</button>
+        </div>
+        <div class="relative">
+          <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-cream-off/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" placeholder="Search landlord or profession…" oninput="searchTable(this.value)"
+            class="bg-navy-card border border-gold-muted/15 text-cream-off/80 placeholder-cream-off/25 text-xs rounded-lg pl-8 pr-4 py-2 outline-none focus:border-gold-muted/40 w-52" />
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-navy-deep border border-gold-muted/14 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" id="mainTable">
+            <thead>
+              <tr class="border-b border-gold-muted/12 text-left">
+                <th class="px-5 py-3.5 badge text-cream-off/35 font-400 w-6">#</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Landlord</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Property Rent</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Tenant Profession</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Request Date</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Status</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Rows injected by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="hidden py-16 text-center">
+          <svg class="w-8 h-8 text-cream-off/15 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <p class="text-cream-off/30 text-sm">No requests match this filter.</p>
+        </div>
+
+        <!-- Table footer -->
+        <div class="border-t border-gold-muted/12 px-5 py-3 flex items-center justify-between">
+          <p class="text-cream-off/30 text-xs" id="rowCount">Showing 12 requests</p>
+          <div class="flex items-center gap-2">
+            <span class="text-cream-off/25 text-xs font-mono" id="pageLabel">Page 1 of 1</span>
+            <div class="flex gap-1 ml-2">
+              <button id="btnPrev" onclick="changePage(-1)"
+                class="px-3 py-1 text-xs font-500 border rounded transition-colors
+                       text-cream-off/25 border-gold-muted/10 cursor-not-allowed opacity-40"
+                disabled>← Prev</button>
+              <button id="btnNext" onclick="changePage(1)"
+                class="px-3 py-1 text-xs font-500 border rounded transition-colors
+                       text-cream-off/25 border-gold-muted/10 cursor-not-allowed opacity-40"
+                disabled>Next →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // ── Data ──────────────────────────────────────────────
+    const requests = [
+      {
+        id: 'HR-001', landlord: 'Alexandra Kowalski', email: 'a.kowalski@email.com', phone: '+1 (212) 555-0142',
+        rent: 8500, propertyValue: 1400000, propertyType: 'Penthouse', location: 'New York, NY',
+        lease: '12 months', profession: 'Investment Banker', industry: 'Finance & Banking',
+        income: '$20,000 – $40,000', employment: 'Corporate',
+        notes: 'Applicant provided two references. No prior evictions reported.',
+        date: '2025-06-24', status: 'Report Ready'
+      },
+      {
+        id: 'HR-002', landlord: 'Marcus Reinholt', email: 'm.reinholt@email.com', phone: '+44 7700 900341',
+        rent: 5200, propertyValue: 920000, propertyType: 'Apartment / Flat', location: 'London, UK',
+        lease: '12 months', profession: 'Software Engineer', industry: 'Technology',
+        income: '$10,000 – $20,000', employment: 'Corporate',
+        notes: '',
+        date: '2025-06-24', status: 'Analyzing'
+      },
+      {
+        id: 'HR-003', landlord: 'Isabelle Fontaine', email: 'i.fontaine@email.com', phone: '+33 6 12 34 56 78',
+        rent: 12000, propertyValue: 2800000, propertyType: 'Villa / Estate', location: 'Paris, France',
+        lease: '24 months', profession: 'Fashion Designer', industry: 'Media & Entertainment',
+        income: '$10,000 – $20,000', employment: 'Self-Employed',
+        notes: 'Previous landlord reference: Jean-Marc Bertrand, +33 6 98 76 54 32.',
+        date: '2025-06-23', status: 'Report Ready'
+      },
+      {
+        id: 'HR-004', landlord: 'Tariq Al-Mansouri', email: 't.almansouri@email.com', phone: '+971 50 123 4567',
+        rent: 7800, propertyValue: 1100000, propertyType: 'Townhouse', location: 'Dubai, UAE',
+        lease: '12 months', profession: 'Surgeon', industry: 'Healthcare',
+        income: '$20,000 – $40,000', employment: 'Government',
+        notes: '',
+        date: '2025-06-23', status: 'Pending'
+      },
+      {
+        id: 'HR-005', landlord: 'Yuki Tanaka', email: 'y.tanaka@email.com', phone: '+81 90 1234 5678',
+        rent: 4500, propertyValue: 780000, propertyType: 'Apartment / Flat', location: 'Tokyo, Japan',
+        lease: '6 months', profession: 'UX Designer', industry: 'Technology',
+        income: '$6,000 – $10,000', employment: 'Freelance',
+        notes: 'Applicant mentioned short-term stay for project contract.',
+        date: '2025-06-22', status: 'Pending'
+      },
+      {
+        id: 'HR-006', landlord: 'Elena Papadopoulos', email: 'e.papa@email.com', phone: '+30 210 123 4567',
+        rent: 3200, propertyValue: 560000, propertyType: 'Apartment / Flat', location: 'Athens, Greece',
+        lease: '12 months', profession: 'Lawyer', industry: 'Legal',
+        income: '$6,000 – $10,000', employment: 'Corporate',
+        notes: '',
+        date: '2025-06-22', status: 'Report Ready'
+      },
+      {
+        id: 'HR-007', landlord: 'Carlos Mendez', email: 'c.mendez@email.com', phone: '+52 55 1234 5678',
+        rent: 6000, propertyValue: 950000, propertyType: 'Detached House', location: 'Mexico City, MX',
+        lease: '18 months', profession: 'Architect', industry: 'Construction & Engineering',
+        income: '$6,000 – $10,000', employment: 'Self-Employed',
+        notes: 'Has two dependents. Requested pet policy clarification.',
+        date: '2025-06-21', status: 'Analyzing'
+      },
+      {
+        id: 'HR-008', landlord: 'Priya Nair', email: 'p.nair@email.com', phone: '+91 98765 43210',
+        rent: 5500, propertyValue: 840000, propertyType: 'Apartment / Flat', location: 'Mumbai, India',
+        lease: '12 months', profession: 'Data Scientist', industry: 'Technology',
+        income: '$6,000 – $10,000', employment: 'Corporate',
+        notes: '',
+        date: '2025-06-21', status: 'Pending'
+      },
+      {
+        id: 'HR-009', landlord: 'Stefan Müller', email: 's.mueller@email.com', phone: '+49 176 1234 5678',
+        rent: 9200, propertyValue: 1650000, propertyType: 'Penthouse', location: 'Berlin, Germany',
+        lease: '24 months', profession: 'CFO', industry: 'Finance & Banking',
+        income: 'Above $40,000', employment: 'Corporate',
+        notes: 'Applicant currently relocating from Frankfurt. Provided company transfer letter reference.',
+        date: '2025-06-20', status: 'Report Ready'
+      },
+      {
+        id: 'HR-010', landlord: 'Amara Osei', email: 'a.osei@email.com', phone: '+233 20 123 4567',
+        rent: 2800, propertyValue: 420000, propertyType: 'Apartment / Flat', location: 'Accra, Ghana',
+        lease: '12 months', profession: 'NGO Program Manager', industry: 'Government / Public Sector',
+        income: '$3,000 – $6,000', employment: 'Government',
+        notes: '',
+        date: '2025-06-20', status: 'Analyzing'
+      },
+      {
+        id: 'HR-011', landlord: 'Lena Bergström', email: 'l.bergstrom@email.com', phone: '+46 70 123 45 67',
+        rent: 4100, propertyValue: 710000, propertyType: 'Townhouse', location: 'Stockholm, Sweden',
+        lease: '12 months', profession: 'Journalist', industry: 'Media & Entertainment',
+        income: '$3,000 – $6,000', employment: 'Freelance',
+        notes: 'Applicant works remotely. Income from three separate clients.',
+        date: '2025-06-19', status: 'Report Ready'
+      },
+      {
+        id: 'HR-012', landlord: 'Kenji Park', email: 'k.park@email.com', phone: '+82 10 1234 5678',
+        rent: 7200, propertyValue: 1250000, propertyType: 'Villa / Estate', location: 'Seoul, South Korea',
+        lease: '24+ months / Long-term', profession: 'Pharmaceutical Exec', industry: 'Healthcare',
+        income: '$20,000 – $40,000', employment: 'Corporate',
+        notes: '',
+        date: '2025-06-18', status: 'Pending'
+      },
+    ];
+
+    // ── Helpers ───────────────────────────────────────────
+    let activeFilter = 'all';
+    let activeSearch = '';
+    let openRow = null;
+
+    // ── Pagination state ──────────────────────────────────
+    const PAGE_SIZE = 12; // all 12 on one page; increase to paginate
+    let currentPage = 1;
+
+    function statusClass(s) {
+      if (s === 'Pending')      return 'st-pending';
+      if (s === 'Analyzing')    return 'st-analyzing';
+      if (s === 'Report Ready') return 'st-ready';
+      return '';
+    }
+
+    function statusDot(s) {
+      if (s === 'Pending')      return 'bg-gold-light';
+      if (s === 'Analyzing')    return 'bg-gold-muted animate-pulse';
+      if (s === 'Report Ready') return 'bg-green-light';
+      return '';
+    }
+
+    function fmt(n) { return '$' + Number(n).toLocaleString(); }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.innerHTML;
+        btn.classList.add('copied');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1800);
+      });
+    }
+
+    // Build the full analyst-copy block for a request
+    function analysisCopyBlock(r) {
+      return `HOMERESI SCREENING REQUEST — ${r.id}
+================================
+Landlord: ${r.landlord} | ${r.email} | ${r.phone}
+
+PROPERTY
+Type: ${r.propertyType}
+Location: ${r.location}
+Monthly Rent: ${fmt(r.rent)}
+Estimated Value: ${r.propertyValue ? fmt(r.propertyValue) : 'Not provided'}
+Lease Duration: ${r.lease}
+
+APPLICANT (ANONYMISED)
+Profession: ${r.profession}
+Industry: ${r.industry}
+Est. Monthly Income: ${r.income}
+Employment Type: ${r.employment}
+
+NOTES / REFERENCES
+${r.notes || 'None provided.'}
+
+Request Date: ${r.date}
+Status: ${r.status}`;
+    }
+
+    // ── Pagination controls ───────────────────────────────
+    function updatePagination(totalRows) {
+      const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+      // Clamp current page
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const pageLabel = document.getElementById('pageLabel');
+      const btnPrev   = document.getElementById('btnPrev');
+      const btnNext   = document.getElementById('btnNext');
+
+      pageLabel.textContent = `Page ${currentPage} of ${totalPages}`;
+
+      // Prev button
+      const prevEnabled = currentPage > 1;
+      btnPrev.disabled = !prevEnabled;
+      btnPrev.className = `px-3 py-1 text-xs font-500 border rounded transition-colors ${
+        prevEnabled
+          ? 'text-gold-muted border-gold-muted/30 hover:border-gold-muted/60 hover:bg-gold-muted/8 cursor-pointer'
+          : 'text-cream-off/25 border-gold-muted/10 cursor-not-allowed opacity-40'
+      }`;
+
+      // Next button
+      const nextEnabled = currentPage < totalPages;
+      btnNext.disabled = !nextEnabled;
+      btnNext.className = `px-3 py-1 text-xs font-500 border rounded transition-colors ${
+        nextEnabled
+          ? 'text-gold-muted border-gold-muted/30 hover:border-gold-muted/60 hover:bg-gold-muted/8 cursor-pointer'
+          : 'text-cream-off/25 border-gold-muted/10 cursor-not-allowed opacity-40'
+      }`;
+    }
+
+    function changePage(dir) {
+      const totalRows   = getFilteredRows().length;
+      const totalPages  = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+      const newPage     = currentPage + dir;
+      if (newPage < 1 || newPage > totalPages) return;
+      currentPage = newPage;
+      openRow = null;
+      renderTable();
+    }
+
+    function getFilteredRows() {
+      return requests.filter(r => {
+        const matchFilter = activeFilter === 'all' || r.status === activeFilter;
+        const q = activeSearch.toLowerCase();
+        const matchSearch = !q || r.landlord.toLowerCase().includes(q)
+                                || r.profession.toLowerCase().includes(q)
+                                || r.id.toLowerCase().includes(q);
+        return matchFilter && matchSearch;
+      });
+    }
+
+    // ── Render ────────────────────────────────────────────
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      const filtered = getFilteredRows();
+      const start    = (currentPage - 1) * PAGE_SIZE;
+      const page     = filtered.slice(start, start + PAGE_SIZE);
+
+      document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+      document.getElementById('rowCount').textContent =
+        `Showing ${filtered.length} request${filtered.length !== 1 ? 's' : ''}`;
+
+      updatePagination(filtered.length);
+
+      page.forEach((r, idx) => {
+        // Main row
+        const tr = document.createElement('tr');
+        tr.className = 'trow border-b border-gold-muted/8 last:border-0';
+        tr.id = 'row-' + r.id;
+        tr.innerHTML = `
+          <td class="px-5 py-4 font-mono text-cream-off/25 text-xs">${start + idx + 1}</td>
+          <td class="px-4 py-4">
+            <p class="text-cream-off text-sm font-500">${r.landlord}</p>
+            <p class="text-cream-off/35 text-xs mt-0.5">${r.id}</p>
+          </td>
+          <td class="px-4 py-4">
+            <p class="text-cream-off text-sm font-mono">${fmt(r.rent)}<span class="text-cream-off/30 font-sans">/mo</span></p>
+            <p class="text-cream-off/35 text-xs mt-0.5">${r.propertyType}</p>
+          </td>
+          <td class="px-4 py-4">
+            <p class="text-cream-off text-sm">${r.profession}</p>
+            <p class="text-cream-off/35 text-xs mt-0.5">${r.employment} · ${r.industry}</p>
+          </td>
+          <td class="px-4 py-4 text-cream-off/60 text-sm font-mono">${r.date}</td>
+          <td class="px-4 py-4">
+            <span class="badge ${statusClass(r.status)} px-2.5 py-1 rounded-full flex items-center gap-1.5 w-fit">
+              <span class="w-1.5 h-1.5 rounded-full ${statusDot(r.status)} inline-block"></span>
+              ${r.status}
+            </span>
+          </td>
+          <td class="px-4 py-4 text-right">
+            <button onclick="toggleDetail('${r.id}')" id="btn-${r.id}"
+              class="text-xs font-500 px-3.5 py-1.5 rounded-lg border border-gold-muted/25 text-gold-muted hover:bg-gold-muted/10 hover:border-gold-muted/50 transition-all flex items-center gap-1.5 ml-auto">
+              <svg class="w-3.5 h-3.5 transition-transform" id="chevron-${r.id}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+              View Details
+            </button>
+          </td>`;
+        tbody.appendChild(tr);
+
+        // Detail panel row
+        const td2 = document.createElement('tr');
+        td2.className = 'detail-panel';
+        td2.id = 'detail-' + r.id;
+        td2.innerHTML = `
+          <td colspan="7" class="px-0 pb-0 pt-0">
+            <div class="detail-inner mx-4 mb-4 bg-slate-ink border border-gold-muted/18 rounded-xl overflow-hidden">
+
+              <!-- Detail header -->
+              <div class="flex items-center justify-between px-5 py-3.5 border-b border-gold-muted/12">
+                <div class="flex items-center gap-2">
+                  <span class="badge text-gold-muted">${r.id}</span>
+                  <span class="text-cream-off/35 text-xs">·</span>
+                  <span class="text-cream-off/50 text-xs">Full submission data</span>
+                </div>
+                <button onclick="copyAll('${r.id}')" id="copyall-${r.id}"
+                  class="copy-btn badge text-gold-muted border border-gold-muted/25 px-3 py-1.5 rounded-lg hover:bg-gold-muted/10 transition-all flex items-center gap-1.5">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  Copy All for Analysis
+                </button>
+              </div>
+
+              <div class="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gold-muted/10">
+
+                <!-- Col 1: Landlord -->
+                <div class="px-5 py-5">
+                  <p class="badge text-cream-off/30 mb-4">Landlord Info</p>
+                  <div class="space-y-3">
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Full Name</p>
+                      <p class="text-cream-off text-sm font-500">${r.landlord}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Email</p>
+                      <p class="text-cream-off text-sm font-mono">${r.email}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Phone</p>
+                      <p class="text-cream-off text-sm font-mono">${r.phone}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Request Date</p>
+                      <p class="text-cream-off text-sm font-mono">${r.date}</p>
+                    </div>
+                  </div>
+
+                  <!-- Status changer -->
+                  <div class="mt-5 pt-4 border-t border-gold-muted/10">
+                    <p class="badge text-cream-off/30 mb-2">Update Status</p>
+                    <select onchange="updateStatus('${r.id}', this.value)"
+                      class="w-full bg-navy-card border border-gold-muted/20 text-cream-off/80 text-xs rounded-lg px-3 py-2 outline-none focus:border-gold-muted/40 font-mono">
+                      <option ${r.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                      <option ${r.status === 'Analyzing' ? 'selected' : ''}>Analyzing</option>
+                      <option ${r.status === 'Report Ready' ? 'selected' : ''}>Report Ready</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Col 2: Property -->
+                <div class="px-5 py-5">
+                  <p class="badge text-cream-off/30 mb-4">Property Info</p>
+                  <div class="space-y-3">
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Type</p>
+                      <p class="text-cream-off text-sm">${r.propertyType}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Location</p>
+                      <p class="text-cream-off text-sm">${r.location}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <p class="text-cream-off/40 text-xs mb-0.5">Monthly Rent</p>
+                        <p class="text-cream-off text-sm font-mono">${fmt(r.rent)}</p>
+                      </div>
+                      <div>
+                        <p class="text-cream-off/40 text-xs mb-0.5">Est. Value</p>
+                        <p class="text-cream-off text-sm font-mono">${r.propertyValue ? fmt(r.propertyValue) : '—'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Lease Duration</p>
+                      <p class="text-cream-off text-sm">${r.lease}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Col 3: Applicant -->
+                <div class="px-5 py-5">
+                  <p class="badge text-cream-off/30 mb-4">Applicant Profile</p>
+                  <div class="space-y-3">
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Profession</p>
+                      <p class="text-cream-off text-sm">${r.profession}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Industry</p>
+                      <p class="text-cream-off text-sm">${r.industry}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Est. Monthly Income</p>
+                      <p class="text-cream-off text-sm font-mono">${r.income}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Employment Type</p>
+                      <span class="badge bg-gold-muted/12 text-gold-muted px-2 py-1 rounded-full">${r.employment}</span>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-1">Notes / References</p>
+                      <p class="text-cream-off/65 text-xs leading-relaxed bg-navy-card rounded-lg p-3 border border-gold-muted/10">${r.notes || '<span class="text-cream-off/25 italic">None provided.</span>'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>`;
+        tbody.appendChild(td2);
+
+        // Re-open detail panel if it was open before re-render
+        if (openRow === r.id) {
+          td2.classList.add('open');
+          const chevron = document.getElementById('chevron-' + r.id);
+          const btn     = document.getElementById('btn-' + r.id);
+          if (chevron) chevron.style.transform = 'rotate(180deg)';
+          if (btn)     btn.classList.add('bg-gold-muted/10');
+        }
+      });
+    }
+
+    function toggleDetail(id) {
+      const panel   = document.getElementById('detail-' + id);
+      const chevron = document.getElementById('chevron-' + id);
+      const btn     = document.getElementById('btn-' + id);
+      if (!panel) return; // guard against stale references
+      const isOpen = panel.classList.contains('open');
+
+      // Close any previously open panel
+      if (openRow && openRow !== id) {
+        const prevPanel   = document.getElementById('detail-' + openRow);
+        const prevChevron = document.getElementById('chevron-' + openRow);
+        const prevBtn     = document.getElementById('btn-' + openRow);
+        if (prevPanel)   prevPanel.classList.remove('open');
+        if (prevChevron) prevChevron.style.transform = 'rotate(0deg)';
+        if (prevBtn)     prevBtn.classList.remove('bg-gold-muted/10');
+      }
+
+      panel.classList.toggle('open', !isOpen);
+      chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      btn.classList.toggle('bg-gold-muted/10', !isOpen);
+      openRow = isOpen ? null : id;
+    }
+
+    function copyAll(id) {
+      const r   = requests.find(x => x.id === id);
+      const btn = document.getElementById('copyall-' + id);
+      if (r && btn) copyText(analysisCopyBlock(r), btn);
+    }
+
+    // ── Fix 1: updateStatus — null-safe with automatic filter reset ──
+    function updateStatus(id, newStatus) {
+      const r = requests.find(x => x.id === id);
+      if (!r) return;
+
+      r.status = newStatus;
+
+      // If the active filter would hide this row after the status change,
+      // reset to 'all' so the updated row stays visible.
+      const wouldDisappear = activeFilter !== 'all' && activeFilter !== newStatus;
+      if (wouldDisappear) {
+        activeFilter = 'all';
+        // Sync filter chip UI back to "All"
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        const allChip = document.querySelector('.filter-chip[onclick*="\'all\'"]');
+        if (allChip) allChip.classList.add('active');
+      }
+
+      // Keep the detail panel open across the re-render
+      openRow = id;
+      const scrollY = window.scrollY;
+      renderTable();
+      window.scrollTo(0, scrollY);
+    }
+
+    function filterTable(f, el) {
+      activeFilter = f;
+      currentPage  = 1;
+      openRow      = null;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderTable();
+    }
+
+    function searchTable(q) {
+      activeSearch = q;
+      currentPage  = 1;
+      openRow      = null;
+      renderTable();
+    }
+
+    // ── Init ──────────────────────────────────────────────
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    renderTable();
+  </script>
+</body>
+</html>
