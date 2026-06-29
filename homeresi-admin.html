@@ -1,6 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+  // This function hashes the entered password and checks it against the secure key
+  async function checkAdminAccess() {
+    const enteredPassword = prompt("Please enter the Admin Password:");
+    
+    if (!enteredPassword) {
+      window.location.href = "index.html";
+      return;
+    }
+
+    // Encrypting the entered password using the SHA-256 algorithm
+    const msgBuffer = new TextEncoder().encode(enteredPassword);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // This is the secure cryptographic hash of your password 'Mami.4128'
+    const secureKey = "c76d29df8365675402035eb52a220268ecf93e9902626e2f1165a6c9d747c3cf";
+
+    if (hashedPassword !== secureKey) {
+      alert("Access Denied! Incorrect password.");
+      window.location.href = "index.html";
+    }
+  }
+
+  // Start the security check immediately when the page loads
+  checkAdminAccess();
+</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Homeresi — Admin Dashboard</title>
