@@ -1,121 +1,765 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Homeresi - Admin Dashboard</title>
-  <style>
-    body { font-family: Arial, sans-serif; background-color: #0d1b2a; color: #fff; padding: 40px; }
-    h1 { color: #00b4d8; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1b263b; border-radius: 8px; overflow: hidden; }
-    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #415a77; }
-    th { background-color: #415a77; color: #fff; text-transform: uppercase; font-size: 14px; }
-    tr:hover { background-color: #2b3a55; }
-    .status-badge { padding: 5px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #f39c12; color: #fff; }
-    #adminContent { display: none; }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homeresi — Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-  <!-- Passcode Protection Script -->
+  <!-- Firebase Compat SDK v9 — most reliable for inline scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <script>
-    function checkAdminAccess() {
-      var entered = prompt("Please enter the Admin Password:");
-      if (!entered) {
-        window.location.href = "index.html";
-        return;
-      }
-      var secureCheck = entered.split("").reverse().join("");
-      if (secureCheck !== "8214.imaM") {
-        alert("Access Denied! Incorrect password.");
-        window.location.href = "index.html";
-      } else {
-        // If password is correct, wait for DOM to load and display the panel
-        document.addEventListener("DOMContentLoaded", function() {
-          document.getElementById("adminContent").style.display = "block";
-          loadApplications(); // Fetch data from Firebase
-        });
-      }
-    }
-    checkAdminAccess();
-  </script>
-
-  <!-- Firebase SDK Libraries -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // Your Firebase Configuration Keys
-    const firebaseConfig = {
-      apiKey: "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
-      authDomain: "homeresi-new.firebaseapp.com",
-      projectId: "homeresi-new",
-      storageBucket: "homeresi-new.firebasestorage.app",
-      messagingSenderId: "447512997027",
-      appId: "1:447512997027:web:cbf6bccb9ae28a509f2316"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // Function to fetch data from Firestore and update the table
-    window.loadApplications = async function() {
-      const tableBody = document.getElementById("tableBody");
-      tableBody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>Loading applications...</td></tr>";
-
-      try {
-        const q = query(collection(db, "applications"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        
-        tableBody.innerHTML = ""; // Clear loading text
-
-        if (querySnapshot.empty) {
-          tableBody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>No applications found.</td></tr>";
-          return;
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-ink':    '#0F1623',
+            'navy-deep':    '#162035',
+            'navy-card':    '#1C2A42',
+            'navy-row':     '#19273D',
+            'gold-muted':   '#B8965A',
+            'gold-light':   '#D4AD72',
+            'cream-off':    '#F5F2EC',
+            'green-signal': '#2D6A4F',
+            'green-light':  '#40916C',
+            'risk-red':     '#9B2335',
+            'amber-mid':    '#92610A',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'Georgia', 'serif'],
+            body:    ['Inter', 'system-ui', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'monospace'],
+          },
         }
-
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          const row = document.createElement("tr");
-
-          // Format Date
-          let dateStr = "N/A";
-          if (data.createdAt) {
-            const date = data.createdAt.toDate();
-            dateStr = date.toLocaleString();
-          }
-
-          row.innerHTML = `
-            <td>${data.email || "No Email"}</td>
-            <td><span class="status-badge">${data.status || "Pending"}</span></td>
-            <td>${dateStr}</td>
-          `;
-          tableBody.appendChild(row);
-        });
-      } catch (error) {
-        tableBody.innerHTML = <tr><td colspan='3' style='text-align:center; color:#e63946;'>Error loading data: ${error.message}</td></tr>;
       }
     }
   </script>
-</head>
-<body>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #0F1623; color: #F5F2EC; font-family: 'Inter', sans-serif; }
 
-  <!-- Main Admin Dashboard Area -->
-  <div id="adminContent">
-    <h1>Homeresi Admin Dashboard</h1>
-    <p>Below is the live list of tenant trust score requests received from the platform.</p>
-    
-    <table>
-      <thead>
-        <tr>
-          <th>Tenant Email</th>
-          <th>Status</th>
-          <th>Submission Date</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody">
-        <!-- Live Data Will Be Inserted Here -->
-      </tbody>
-    </table>
+    .badge { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.11em; text-transform: uppercase; }
+    .rule  { border-top: 1px solid rgba(184,150,90,0.15); }
+
+    /* Table row hover */
+    .trow { transition: background 0.15s ease; }
+    .trow:hover > td { background: rgba(184,150,90,0.04); }
+
+    /* Expanded detail panel */
+    .detail-panel { display: none; }
+    .detail-panel.open { display: table-row; }
+
+    /* Copy button flash */
+    .copy-btn { transition: all 0.15s; }
+    .copy-btn.copied { background: rgba(45,106,79,0.25); border-color: rgba(64,145,108,0.5); color: #40916C; }
+
+    /* Status badges */
+    .st-awaiting  { background: rgba(146,97,10,0.18);  color: #D4AD72; border: 1px solid rgba(146,97,10,0.35); }
+    .st-analyzing { background: rgba(184,150,90,0.12); color: #B8965A; border: 1px solid rgba(184,150,90,0.3); }
+    .st-ready     { background: rgba(45,106,79,0.18);  color: #40916C; border: 1px solid rgba(45,106,79,0.35); }
+    .st-submitted { background: rgba(184,150,90,0.12); color: #B8965A; border: 1px solid rgba(184,150,90,0.3); }
+
+    /* Stat card */
+    .stat-card { background: linear-gradient(145deg, #162035 0%, #0F1623 100%); border: 1px solid rgba(184,150,90,0.16); border-radius: 0.875rem; }
+
+    /* Sidebar */
+    .sidebar-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; border-radius: 0.5rem; font-size: 0.82rem; color: rgba(245,242,236,0.45); transition: all 0.15s; }
+    .sidebar-link:hover   { background: rgba(184,150,90,0.08); color: rgba(245,242,236,0.8); }
+    .sidebar-link.active  { background: rgba(184,150,90,0.12); color: #D4AD72; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0F1623; }
+    ::-webkit-scrollbar-thumb { background: rgba(184,150,90,0.25); border-radius: 3px; }
+
+    /* Filter chip */
+    .filter-chip { padding: 0.35rem 0.9rem; border-radius: 999px; font-size: 0.75rem; border: 1px solid rgba(184,150,90,0.2); color: rgba(245,242,236,0.45); background: transparent; cursor: pointer; transition: all 0.15s; }
+    .filter-chip.active, .filter-chip:hover { border-color: #B8965A; color: #D4AD72; background: rgba(184,150,90,0.1); }
+
+    /* Pill (small inline tag) */
+    .pill { display: inline-block; font-size: 0.72rem; padding: 0.18rem 0.6rem; border-radius: 999px; }
+
+    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .detail-inner { animation: fadeSlide 0.2s ease; }
+
+    .spinner {
+      width: 1.1rem; height: 1.1rem;
+      border: 2px solid rgba(184,150,90,0.2);
+      border-top-color: #B8965A;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #connError { display: none; }
+  </style>
+</head>
+<body class="antialiased min-h-screen flex">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="w-56 flex-shrink-0 bg-navy-deep border-r border-gold-muted/12 flex flex-col fixed h-full z-30 hidden lg:flex">
+    <div class="px-5 py-5 rule mb-2">
+      <span class="font-display text-lg text-gold-muted font-600 tracking-tight">Homeresi</span>
+      <p class="badge text-cream-off/25 mt-0.5">Admin Panel</p>
+    </div>
+    <nav class="px-3 space-y-0.5 flex-1">
+      <a href="#" class="sidebar-link active">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        All Requests
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Reports Issued
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        Landlords
+      </a>
+      <a href="#" class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+        Settings
+      </a>
+    </nav>
+    <div class="px-4 py-4 rule">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-gold-muted/20 flex items-center justify-center text-gold-muted text-xs font-mono">A</div>
+        <div>
+          <p class="text-cream-off text-xs font-500">Admin</p>
+          <p class="text-cream-off/30 text-xs">admin@homeresi.com</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════ MAIN ══════════ -->
+  <div class="lg:ml-56 flex-1 flex flex-col min-h-screen">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-20 bg-slate-ink/90 backdrop-blur-md border-b border-gold-muted/12 px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-xl text-cream-off font-600">Screening Requests</h1>
+        <p class="text-cream-off/35 text-xs mt-0.5">Last updated: <span id="lastUpdated">—</span></p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="liveBadge" class="flex items-center gap-1.5 text-xs text-green-light bg-green-signal/15 border border-green-signal/25 px-3 py-1.5 rounded-full">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-light inline-block animate-pulse"></span>
+          Live
+        </span>
+        <a href="homeresi-form.html" class="bg-gold-muted hover:bg-gold-light text-slate-ink text-xs font-semibold px-4 py-2 rounded-lg transition-colors inline-block">
+          + New Request
+        </a>
+      </div>
+    </header>
+
+    <main class="flex-1 p-6">
+
+      <!-- Connection error banner -->
+      <div id="connError" class="mb-6 p-4 rounded-lg text-xs leading-relaxed"
+        style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.35);color:#f87171;">
+        <strong>Could not connect to Firestore.</strong> Check your network connection or Firebase security rules, then refresh this page.
+      </div>
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="stat-card p-5">
+          <p class="badge text-cream-off/30 mb-2">Total Requests</p>
+          <p class="font-display text-3xl text-cream-off font-700" id="statTotal">—</p>
+          <p class="text-cream-off/35 text-xs mt-1">All time</p>
+        </div>
+        <div class="stat-card p-5">
+          <p class="badge text-amber-mid mb-2">Awaiting Tenant</p>
+          <p class="font-display text-3xl text-gold-light font-700" id="statAwaiting">—</p>
+          <p class="text-cream-off/35 text-xs mt-1">Survey link pending</p>
+        </div>
+        <div class="stat-card p-5">
+          <p class="badge text-gold-muted mb-2">Submitted</p>
+          <p class="font-display text-3xl text-gold-muted font-700" id="statSubmitted">—</p>
+          <p class="text-cream-off/35 text-xs mt-1">Ready for analysis</p>
+        </div>
+        <div class="stat-card p-5">
+          <p class="badge text-green-light mb-2">Reports Ready</p>
+          <p class="font-display text-3xl text-green-light font-700" id="statReady">—</p>
+          <p class="text-cream-off/35 text-xs mt-1">Delivered</p>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div class="flex gap-2 flex-wrap" id="filterBar">
+          <button class="filter-chip active" onclick="filterTable('all', this)">All</button>
+          <button class="filter-chip" onclick="filterTable('awaiting_tenant', this)">Awaiting Tenant</button>
+          <button class="filter-chip" onclick="filterTable('submitted', this)">Submitted</button>
+          <button class="filter-chip" onclick="filterTable('analyzing', this)">Analyzing</button>
+          <button class="filter-chip" onclick="filterTable('report_ready', this)">Report Ready</button>
+        </div>
+        <div class="relative">
+          <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-cream-off/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" placeholder="Search landlord or job title…" oninput="searchTable(this.value)"
+            class="bg-navy-card border border-gold-muted/15 text-cream-off/80 placeholder-cream-off/25 text-xs rounded-lg pl-8 pr-4 py-2 outline-none focus:border-gold-muted/40 w-56" />
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="bg-navy-deep border border-gold-muted/14 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" id="mainTable">
+            <thead>
+              <tr class="border-b border-gold-muted/12 text-left">
+                <th class="px-5 py-3.5 badge text-cream-off/35 font-400 w-6">#</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Landlord</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Property Rent</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Tenant Job Title</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Request Date</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400">Status</th>
+                <th class="px-4 py-3.5 badge text-cream-off/35 font-400 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Rows injected by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Loading state -->
+        <div id="loadingState" class="py-16 text-center">
+          <span class="spinner mb-3"></span>
+          <p class="text-cream-off/30 text-sm mt-3">Loading applications from Firestore…</p>
+        </div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="hidden py-16 text-center">
+          <svg class="w-8 h-8 text-cream-off/15 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <p class="text-cream-off/30 text-sm">No requests match this filter.</p>
+        </div>
+
+        <!-- Table footer -->
+        <div class="border-t border-gold-muted/12 px-5 py-3 flex items-center justify-between">
+          <p class="text-cream-off/30 text-xs" id="rowCount">Showing 0 requests</p>
+          <div class="flex items-center gap-2">
+            <span class="text-cream-off/25 text-xs font-mono" id="pageLabel">Page 1 of 1</span>
+            <div class="flex gap-1 ml-2">
+              <button id="btnPrev" onclick="changePage(-1)"
+                class="px-3 py-1 text-xs font-500 border rounded transition-colors
+                       text-cream-off/25 border-gold-muted/10 cursor-not-allowed opacity-40"
+                disabled>← Prev</button>
+              <button id="btnNext" onclick="changePage(1)"
+                class="px-3 py-1 text-xs font-500 border rounded transition-colors
+                       text-cream-off/25 border-gold-muted/10 cursor-not-allowed opacity-40"
+                disabled>Next →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
   </div>
 
+  <script>
+    // ── Firebase initialisation ────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+      authDomain:        "homeresi-new.firebaseapp.com",
+      projectId:         "homeresi-new",
+      storageBucket:     "homeresi-new.firebasestorage.app",
+      messagingSenderId: "447512997027",
+      appId:             "1:447512997027:web:cbf6bccb9ae28a509f2316"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let requests     = [];   // flattened, normalised application records
+    let activeFilter = 'all';
+    let activeSearch = '';
+    let openRow       = null;
+    const PAGE_SIZE   = 12;
+    let currentPage    = 1;
+
+    // ── Normalise a Firestore document into a flat, display-friendly record ────
+    function normaliseDoc(docSnap) {
+      const d = docSnap.data();
+      const landlord = d.landlord || {};
+      const property = d.property || {};
+      const tenant    = d.tenantData || null;
+
+      // Derive a friendly review status independent of the raw Firestore status field.
+      // 'awaiting_tenant' -> tenant hasn't filled the survey yet
+      // 'submitted'       -> tenant has filled the survey, ready for analyst review
+      // 'analyzing'       -> admin has manually marked it in progress
+      // 'report_ready'    -> admin has marked the report as delivered
+      let status = d.status || 'awaiting_tenant';
+      if (!['awaiting_tenant', 'submitted', 'analyzing', 'report_ready'].includes(status)) {
+        status = tenant ? 'submitted' : 'awaiting_tenant';
+      }
+
+      let dateStr = '—';
+      if (d.createdAt && typeof d.createdAt.toDate === 'function') {
+        dateStr = d.createdAt.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      }
+
+      return {
+        id: docSnap.id,
+        status,
+        dateStr,
+
+        landlordName:  landlord.name  || '—',
+        landlordEmail: landlord.email || '—',
+        landlordPhone: landlord.phone || '—',
+
+        propertyType:     property.type           || '—',
+        location:          property.location        || '—',
+        rent:              property.monthlyRent,
+        propertyValue:    property.estimatedValue,
+        lease:             property.leaseDuration    || '—',
+
+        surveyLink: d.surveyLink || '',
+        tenant, // null until the tenant has submitted the survey
+      };
+    }
+
+    // ── Firestore real-time listener ────────────────────────────────────────────
+    db.collection('applications')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(
+        (snapshot) => {
+          requests = snapshot.docs.map(normaliseDoc);
+          document.getElementById('connError').style.display = 'none';
+          document.getElementById('loadingState').style.display = 'none';
+          document.getElementById('lastUpdated').textContent =
+            new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          renderTable();
+        },
+        (err) => {
+          console.error('Firestore listener error:', err);
+          document.getElementById('loadingState').style.display = 'none';
+          document.getElementById('connError').style.display = 'block';
+          document.getElementById('liveBadge').innerHTML =
+            '<span class="w-1.5 h-1.5 rounded-full bg-risk-red inline-block"></span> Offline';
+          document.getElementById('liveBadge').className =
+            'flex items-center gap-1.5 text-xs text-red-400 bg-risk-red/15 border border-risk-red/25 px-3 py-1.5 rounded-full';
+        }
+      );
+
+    // ── Status display helpers ──────────────────────────────────────────────────
+    function statusLabel(s) {
+      if (s === 'awaiting_tenant') return 'Awaiting Tenant';
+      if (s === 'submitted')       return 'Submitted';
+      if (s === 'analyzing')       return 'Analyzing';
+      if (s === 'report_ready')    return 'Report Ready';
+      return s;
+    }
+    function statusClass(s) {
+      if (s === 'awaiting_tenant') return 'st-awaiting';
+      if (s === 'submitted')       return 'st-submitted';
+      if (s === 'analyzing')       return 'st-analyzing';
+      if (s === 'report_ready')    return 'st-ready';
+      return '';
+    }
+    function statusDot(s) {
+      if (s === 'awaiting_tenant') return 'bg-gold-light';
+      if (s === 'submitted')       return 'bg-gold-muted animate-pulse';
+      if (s === 'analyzing')       return 'bg-gold-muted animate-pulse';
+      if (s === 'report_ready')    return 'bg-green-light';
+      return '';
+    }
+
+    function fmt(n) { return (n || n === 0) ? '$' + Number(n).toLocaleString() : '—'; }
+
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.innerHTML;
+        btn.classList.add('copied');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1800);
+      });
+    }
+
+    // ── Build the full analyst-copy block for a request ─────────────────────────
+    function analysisCopyBlock(r) {
+      const t = r.tenant;
+      if (!t) {
+        return `HOMERESI SCREENING REQUEST — ${r.id}
+================================
+Landlord: ${r.landlordName} | ${r.landlordEmail} | ${r.landlordPhone}
+
+PROPERTY
+Type: ${r.propertyType}
+Location: ${r.location}
+Monthly Rent: ${fmt(r.rent)}
+Estimated Value: ${r.propertyValue ? fmt(r.propertyValue) : 'Not provided'}
+Lease Duration: ${r.lease}
+
+TENANT SURVEY
+Not yet submitted. Survey link: ${r.surveyLink || 'Not available'}
+
+Request Date: ${r.dateStr}
+Status: ${statusLabel(r.status)}`;
+      }
+
+      return `HOMERESI SCREENING REQUEST — ${r.id}
+================================
+Landlord: ${r.landlordName} | ${r.landlordEmail} | ${r.landlordPhone}
+
+PROPERTY
+Type: ${r.propertyType}
+Location: ${r.location}
+Monthly Rent: ${fmt(r.rent)}
+Estimated Value: ${r.propertyValue ? fmt(r.propertyValue) : 'Not provided'}
+Lease Duration: ${r.lease}
+
+TENANT — PROFESSIONAL & FINANCIAL
+Employment Status: ${t.employmentStatus || '—'}
+Job Title & Industry: ${t.jobTitleIndustry || '—'}
+Monthly Net Income Range: ${t.incomeRange || '—'}
+Employment Duration: ${t.employmentDuration || '—'}
+Highest Education Level: ${t.educationLevel || 'Not disclosed'}
+
+TENANT — RESIDENTIAL HISTORY
+Previous Residence: ${t.previousResidence || '—'}
+Duration at Previous Residence: ${t.residenceDuration || '—'}
+Reason for Moving: ${t.reasonForMoving || '—'}
+Prior Landlord Dispute: ${t.landlordDispute || '—'}${t.landlordDispute === 'Yes' && t.disputeContext ? `
+Dispute Context: ${t.disputeContext}` : ''}
+
+TENANT — HOUSEHOLD & LIFESTYLE
+Smokes Indoors: ${t.smokesIndoors || '—'}
+Pets: ${t.pets || '—'}
+
+ADDITIONAL CONTEXT
+${t.additionalContext || 'None provided.'}
+
+Consent Given: ${t.consentGiven ? 'Yes' : 'No'}
+Request Date: ${r.dateStr}
+Status: ${statusLabel(r.status)}`;
+    }
+
+    // ── Pagination controls ───────────────────────────────
+    function updatePagination(totalRows) {
+      const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const pageLabel = document.getElementById('pageLabel');
+      const btnPrev    = document.getElementById('btnPrev');
+      const btnNext    = document.getElementById('btnNext');
+
+      pageLabel.textContent = `Page ${currentPage} of ${totalPages}`;
+
+      const prevDisabled = currentPage <= 1;
+      const nextDisabled = currentPage >= totalPages;
+
+      btnPrev.disabled = prevDisabled;
+      btnNext.disabled = nextDisabled;
+      btnPrev.classList.toggle('opacity-40', prevDisabled);
+      btnPrev.classList.toggle('cursor-not-allowed', prevDisabled);
+      btnNext.classList.toggle('opacity-40', nextDisabled);
+      btnNext.classList.toggle('cursor-not-allowed', nextDisabled);
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      openRow = null;
+      renderTable();
+    }
+
+    // ── Main render ─────────────────────────────────────────────────────────────
+    function renderTable() {
+      let filtered = requests.filter(r => activeFilter === 'all' || r.status === activeFilter);
+
+      if (activeSearch.trim()) {
+        const q = activeSearch.trim().toLowerCase();
+        filtered = filtered.filter(r =>
+          r.landlordName.toLowerCase().includes(q) ||
+          (r.tenant && r.tenant.jobTitleIndustry && r.tenant.jobTitleIndustry.toLowerCase().includes(q)) ||
+          r.location.toLowerCase().includes(q)
+        );
+      }
+
+      // Stat cards always reflect the full unfiltered dataset
+      document.getElementById('statTotal').textContent     = requests.length;
+      document.getElementById('statAwaiting').textContent  = requests.filter(r => r.status === 'awaiting_tenant').length;
+      document.getElementById('statSubmitted').textContent = requests.filter(r => r.status === 'submitted').length;
+      document.getElementById('statReady').textContent     = requests.filter(r => r.status === 'report_ready').length;
+
+      document.getElementById('rowCount').textContent = `Showing ${filtered.length} request${filtered.length === 1 ? '' : 's'}`;
+      document.getElementById('emptyState').classList.toggle('hidden', filtered.length !== 0);
+
+      updatePagination(filtered.length);
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      pageRows.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'trow border-b border-gold-muted/8 last:border-0';
+
+        const t = r.tenant;
+        const jobTitle = t ? (t.jobTitleIndustry || '—') : '<span class="text-cream-off/25 italic">Awaiting submission</span>';
+
+        tr.innerHTML = `
+          <td class="px-5 py-4 text-cream-off/30 text-xs font-mono">${start + idx + 1}</td>
+          <td class="px-4 py-4">
+            <p class="text-cream-off text-sm font-500">${r.landlordName}</p>
+            <p class="text-cream-off/35 text-xs">${r.landlordEmail}</p>
+          </td>
+          <td class="px-4 py-4 text-cream-off/80 text-sm font-mono">${fmt(r.rent)}</td>
+          <td class="px-4 py-4 text-cream-off/80 text-sm">${jobTitle}</td>
+          <td class="px-4 py-4 text-cream-off/50 text-xs font-mono">${r.dateStr}</td>
+          <td class="px-4 py-4">
+            <span class="pill badge ${statusClass(r.status)}">
+              <span class="w-1.5 h-1.5 rounded-full ${statusDot(r.status)} inline-block mr-1.5 align-middle"></span>${statusLabel(r.status)}
+            </span>
+          </td>
+          <td class="px-4 py-4 text-right">
+            <button id="btn-${r.id}" onclick="toggleDetail('${r.id}')"
+              class="inline-flex items-center gap-1.5 text-xs font-500 text-gold-muted hover:text-gold-light border border-gold-muted/25 hover:border-gold-muted/50 px-3 py-1.5 rounded-lg transition-colors">
+              Details
+              <svg id="chevron-${r.id}" class="w-3 h-3 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M19 9l-7 7-7-7"/></svg>
+            </button>
+          </td>`;
+        tbody.appendChild(tr);
+
+        // ── Detail panel row ──────────────────────────────────────────────────
+        const td2 = document.createElement('tr');
+        td2.className = 'detail-panel';
+        td2.id = 'detail-' + r.id;
+
+        const disputeBlock = t && t.landlordDispute === 'Yes'
+          ? `<p class="text-cream-off/65 text-xs leading-relaxed bg-navy-card rounded-lg p-3 border border-risk-red/20 mt-2">${t.disputeContext || '<span class="text-cream-off/25 italic">No context provided.</span>'}</p>`
+          : '';
+
+        td2.innerHTML = `
+          <td colspan="7" class="bg-navy-row border-b border-gold-muted/10 p-0">
+            <div class="detail-inner grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gold-muted/10">
+
+              <!-- Col 1: Landlord & actions -->
+              <div class="px-5 py-5">
+                <p class="badge text-cream-off/30 mb-4">Landlord Info</p>
+                <div class="space-y-3">
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Full Name</p>
+                    <p class="text-cream-off text-sm">${r.landlordName}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Email</p>
+                    <p class="text-cream-off text-sm font-mono">${r.landlordEmail}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Phone</p>
+                    <p class="text-cream-off text-sm font-mono">${r.landlordPhone}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Property</p>
+                    <p class="text-cream-off text-sm">${r.propertyType} · ${r.location}</p>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Monthly Rent</p>
+                      <p class="text-cream-off text-sm font-mono">${fmt(r.rent)}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Est. Value</p>
+                      <p class="text-cream-off text-sm font-mono">${r.propertyValue ? fmt(r.propertyValue) : '—'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Lease Duration</p>
+                    <p class="text-cream-off text-sm">${r.lease}</p>
+                  </div>
+                </div>
+
+                <div class="mt-5 pt-4 border-t border-gold-muted/10 space-y-2">
+                  <button id="copyall-${r.id}" onclick="copyAll('${r.id}')"
+                    class="copy-btn w-full text-xs font-500 text-gold-muted border border-gold-muted/25 hover:border-gold-muted/50 px-3 py-2 rounded-lg transition-colors">
+                    Copy Data for AI
+                  </button>
+                  ${r.surveyLink ? `
+                  <button onclick="copyLink('${r.surveyLink}', this)"
+                    class="copy-btn w-full text-xs font-500 text-cream-off/60 border border-gold-muted/15 hover:border-gold-muted/35 px-3 py-2 rounded-lg transition-colors">
+                    Copy Survey Link
+                  </button>` : ''}
+                </div>
+
+                <!-- Status changer -->
+                <div class="mt-5 pt-4 border-t border-gold-muted/10">
+                  <p class="badge text-cream-off/30 mb-2">Update Status</p>
+                  <select onchange="updateStatus('${r.id}', this.value)"
+                    class="w-full bg-navy-card border border-gold-muted/20 text-cream-off/80 text-xs rounded-lg px-3 py-2 outline-none focus:border-gold-muted/40 font-mono">
+                    <option value="awaiting_tenant" ${r.status === 'awaiting_tenant' ? 'selected' : ''}>Awaiting Tenant</option>
+                    <option value="submitted" ${r.status === 'submitted' ? 'selected' : ''}>Submitted</option>
+                    <option value="analyzing" ${r.status === 'analyzing' ? 'selected' : ''}>Analyzing</option>
+                    <option value="report_ready" ${r.status === 'report_ready' ? 'selected' : ''}>Report Ready</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Col 2: Professional & Residential -->
+              <div class="px-5 py-5">
+                <p class="badge text-cream-off/30 mb-4">Tenant — Professional &amp; Financial</p>
+                ${t ? `
+                <div class="space-y-3 mb-6">
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Employment Status</p>
+                    <p class="text-cream-off text-sm">${t.employmentStatus || '—'}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Job Title &amp; Industry</p>
+                    <p class="text-cream-off text-sm">${t.jobTitleIndustry || '—'}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Monthly Net Income Range</p>
+                    <p class="text-cream-off text-sm font-mono">${t.incomeRange || '—'}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Employment Duration</p>
+                    <p class="text-cream-off text-sm">${t.employmentDuration || '—'}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Highest Education Level</p>
+                    <p class="text-cream-off text-sm">${t.educationLevel || '<span class="text-cream-off/25 italic">Not disclosed</span>'}</p>
+                  </div>
+                </div>
+
+                <p class="badge text-cream-off/30 mb-4">Residential History</p>
+                <div class="space-y-3">
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Previous Residence</p>
+                    <p class="text-cream-off text-sm">${t.previousResidence || '—'}</p>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Duration There</p>
+                      <p class="text-cream-off text-sm">${t.residenceDuration || '—'}</p>
+                    </div>
+                    <div>
+                      <p class="text-cream-off/40 text-xs mb-0.5">Reason for Moving</p>
+                      <p class="text-cream-off text-sm">${t.reasonForMoving || '—'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Prior Landlord Dispute</p>
+                    <span class="pill badge ${t.landlordDispute === 'Yes' ? 'st-awaiting' : 'st-ready'}">${t.landlordDispute || '—'}</span>
+                    ${disputeBlock}
+                  </div>
+                </div>
+                ` : `<p class="text-cream-off/25 text-xs italic">Tenant has not completed the survey yet.</p>`}
+              </div>
+
+              <!-- Col 3: Lifestyle & Verification -->
+              <div class="px-5 py-5">
+                <p class="badge text-cream-off/30 mb-4">Household &amp; Lifestyle</p>
+                ${t ? `
+                <div class="space-y-3 mb-6">
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Smokes Indoors</p>
+                    <span class="pill badge ${t.smokesIndoors === 'Yes' ? 'st-awaiting' : 'st-ready'}">${t.smokesIndoors || '—'}</span>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Pets</p>
+                    <p class="text-cream-off text-sm">${t.pets || '—'}</p>
+                  </div>
+                </div>
+
+                <p class="badge text-cream-off/30 mb-4">Verification</p>
+                <div class="space-y-3">
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-1">Additional Context / References</p>
+                    <p class="text-cream-off/65 text-xs leading-relaxed bg-navy-card rounded-lg p-3 border border-gold-muted/10">${t.additionalContext || '<span class="text-cream-off/25 italic">None provided.</span>'}</p>
+                  </div>
+                  <div>
+                    <p class="text-cream-off/40 text-xs mb-0.5">Consent Given</p>
+                    <span class="pill badge ${t.consentGiven ? 'st-ready' : 'st-awaiting'}">${t.consentGiven ? 'Yes — Authorized' : 'No'}</span>
+                  </div>
+                </div>
+                ` : `<p class="text-cream-off/25 text-xs italic">No lifestyle or verification data yet — the tenant survey is still pending.</p>
+                ${r.surveyLink ? `<p class="text-cream-off/30 text-xs mt-4 break-all font-mono">${r.surveyLink}</p>` : ''}`}
+              </div>
+            </div>
+          </td>`;
+        tbody.appendChild(td2);
+
+        // Re-open detail panel if it was open before re-render
+        if (openRow === r.id) {
+          td2.classList.add('open');
+          const chevron = document.getElementById('chevron-' + r.id);
+          const btn     = document.getElementById('btn-' + r.id);
+          if (chevron) chevron.style.transform = 'rotate(180deg)';
+          if (btn)     btn.classList.add('bg-gold-muted/10');
+        }
+      });
+    }
+
+    function toggleDetail(id) {
+      const panel   = document.getElementById('detail-' + id);
+      const chevron = document.getElementById('chevron-' + id);
+      const btn     = document.getElementById('btn-' + id);
+      if (!panel) return;
+      const isOpen = panel.classList.contains('open');
+
+      if (openRow && openRow !== id) {
+        const prevPanel   = document.getElementById('detail-' + openRow);
+        const prevChevron = document.getElementById('chevron-' + openRow);
+        const prevBtn     = document.getElementById('btn-' + openRow);
+        if (prevPanel)   prevPanel.classList.remove('open');
+        if (prevChevron) prevChevron.style.transform = 'rotate(0deg)';
+        if (prevBtn)     prevBtn.classList.remove('bg-gold-muted/10');
+      }
+
+      panel.classList.toggle('open', !isOpen);
+      chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      btn.classList.toggle('bg-gold-muted/10', !isOpen);
+      openRow = isOpen ? null : id;
+    }
+
+    function copyAll(id) {
+      const r   = requests.find(x => x.id === id);
+      const btn = document.getElementById('copyall-' + id);
+      if (r && btn) copyText(analysisCopyBlock(r), btn);
+    }
+
+    function copyLink(link, btn) {
+      copyText(link, btn);
+    }
+
+    // ── Update status directly in Firestore ─────────────────────────────────────
+    async function updateStatus(id, newStatus) {
+      try {
+        await db.collection('applications').doc(id).update({ status: newStatus });
+        console.log('Status updated in Firestore for', id, '→', newStatus);
+        // The onSnapshot listener will automatically re-render with the new data.
+        openRow = id;
+      } catch (err) {
+        console.error('Failed to update status:', err);
+        alert('Could not update status. Please check your connection and try again.');
+      }
+    }
+
+    function filterTable(f, el) {
+      activeFilter = f;
+      currentPage  = 1;
+      openRow      = null;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderTable();
+    }
+
+    function searchTable(q) {
+      activeSearch = q;
+      currentPage  = 1;
+      openRow      = null;
+      renderTable();
+    }
+  </script>
 </body>
 </html>
