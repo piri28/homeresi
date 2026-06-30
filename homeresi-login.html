@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homeresi - Admin Login</title>
+    <style>
+        body { 
+            background: #11141a; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        .login-card { 
+            background: #1e2330; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3); 
+            text-align: center; 
+            width: 100%;
+            max-width: 360px;
+        }
+        h2 {
+            margin-bottom: 24px;
+            font-size: 24px;
+            color: #d4af37;
+        }
+        input { 
+            display: block; 
+            width: 100%; 
+            padding: 12px; 
+            margin: 14px 0; 
+            border: 1px solid #2c3448; 
+            background: #11141a;
+            color: white;
+            border-radius: 6px; 
+            box-sizing: border-box; 
+            font-size: 14px;
+        }
+        input:focus {
+            outline: 1px solid #d4af37;
+        }
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            background: #d4af37; 
+            border: none; 
+            color: #11141a; 
+            font-weight: bold; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px;
+            transition: background 0.2s ease;
+        }
+        button:hover {
+            background: #bfa030;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>Homeresi Admin</h2>
+    <input type="email" id="email" placeholder="Email Address" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <button onclick="handleLogin()">Sign In</button>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+    authDomain: "homeresi-new.firebaseapp.com",
+    projectId: "homeresi-new",
+    storageBucket: "homeresi-new.firebasestorage.app",
+    messagingSenderId: "447512997027",
+    appId: "1:447512997027:web:cbf6bccb9ae28a509f2316"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  async function handleLogin() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      window.location.href = 'homeresi-admin.html';
+    } catch (error) {
+      alert('Authentication failed: ' + error.message);
+    }
+  }
+  window.handleLogin = handleLogin;
+</script>
+
+</body>
+</html>
