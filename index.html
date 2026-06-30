@@ -435,6 +435,60 @@
       </div>
     </div>
   </footer>
+<!-- PRIVACY POLICY MODAL -->
+<div id="privacyModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-4 animate-fade-in">
+    <div class="bg-[#0F1623] border border-[#B8965A]/20 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 md:p-8 shadow-2xl relative">
+        <button onclick="closeModal('privacyModal')" class="absolute top-4 right-4 text-gray-400 hover:text-[#B8965A] transition-colors">
+            <svg class="w-6 	h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <h3 class="text-2xl font-bold text-[#B8965A] mb-4 font-serif">Privacy Policy</h3>
+        <div class="text-gray-300 space-y-4 text-sm leading-relaxed">
+            <p><strong>Last Updated:</strong> June 2026</p>
+            <p>At Homeresi, we take your privacy seriously. This policy outlines how we handle data collected through our tenant screening and survey infrastructure.</p>
+            <h4 class="text-white font-semibold mt-2">1. Data Collection & Processing</h4>
+            <p>We securely process information through Firebase Firestore to generate risk assessments and trust scores. This data includes names, identity verification details, occupational background, and financial history as provided voluntarily by landlords and tenants.</p>
+            <h4 class="text-white font-semibold mt-2">2. Data Security & Retention</h4>
+            <p>All sensitive records are stored in encrypted cloud environments. We never sell or share tenant screening data with unauthorized third parties. Information is strictly utilized to deliver the requested reporting products to the organizing landlord.</p>
+            <p>For explicit requests regarding your data, please contact us at <span class="text-[#B8965A]">homeresicom@gmail.com</span>.</p>
+        </div>
+    </div>
+</div>
 
+<!-- TERMS OF SERVICE MODAL -->
+<div id="termsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-4 animate-fade-in">
+    <div class="bg-[#0F1623] border border-[#B8965A]/20 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 md:p-8 shadow-2xl relative">
+        <button onclick="closeModal('termsModal')" class="absolute top-4 right-4 text-gray-400 hover:text-[#B8965A] transition-colors">
+            <svg class="w-6 	h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <h3 class="text-2xl font-bold text-[#B8965A] mb-4 font-serif">Terms of Service</h3>
+        <div class="text-gray-300 space-y-4 text-sm leading-relaxed">
+            <p>Welcome to Homeresi. By utilizing our tools, web application, and verification mechanisms, you fully agree to the following conditions.</p>
+            <h4 class="text-white font-semibold mt-2">1. Scope of Service</h4>
+            <p>Homeresi provides statistical risk assessment and background screening guidance based on publicly verifiable benchmarks and independent review. Our system generates automated insights and scores to assist landlords in their decision-making processes.</p>
+            <h4 class="text-white font-semibold mt-2">2. Liability Disclaimer</h4>
+            <p>Homeresi is strictly an advisory framework. We do not offer absolute binding legal advice or concrete background guarantees. Landlords bear sole legal, financial, and regulatory responsibility for any tenancy agreements, subsequent disputes, property damage, or contractual outcomes entered into following the review of our screening reports.</p>
+        </div>
+    </div>
+</div>
+
+<!-- CONTACT MODAL -->
+<div id="contactModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50 p-4 animate-fade-in">
+    <div class="bg-[#0F1623] border border-[#B8965A]/20 rounded-2xl max-w-md w-full p-6 md:p-8 shadow-2xl relative">
+        <button onclick="closeModal('contactModal')" class="absolute top-4 right-4 text-gray-400 hover:text-[#B8965A] transition-colors">
+            <svg class="w-6 	h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <h3 class="text-2xl font-bold text-[#B8965A] mb-4 font-serif">Contact Us</h3>
+        <p class="text-gray-300 mb-6 text-sm leading-relaxed">Have questions about our background checks, pricing models, or your personal screening dossier? Get in touch with our team directly.</p>
+        <div class="bg-[#1A2333] border border-[#B8965A]/10 rounded-xl p-4 flex items-center space-x-4">
+            <div class="bg-[#B8965A]/10 p-3 rounded-lg text-[#B8965A]">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            </div>
+            <div>
+                <p class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Official Support Email</p>
+                <a href="mailto:homeresicom@gmail.com" class="text-white hover:text-[#B8965A] font-medium transition-colors">homeresicom@gmail.com</a>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
