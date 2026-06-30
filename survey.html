@@ -162,6 +162,75 @@
       .spinner { animation: none; }
       .progress-fill { transition: none; }
     }
+
+    /* ── Legal modal ── */
+    .legal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10,14,22,0.72);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+    }
+    .legal-overlay.open { display: flex; }
+    .legal-modal {
+      background: linear-gradient(150deg, #162035 0%, #0F1623 100%);
+      border: 1px solid rgba(184,150,90,0.22);
+      border-radius: 1.25rem;
+      width: 100%;
+      max-width: 32rem;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 70px rgba(0,0,0,0.5);
+      animation: legalIn 0.22s ease;
+    }
+    @keyframes legalIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .legal-panel { display: none; padding: 2rem; }
+    .legal-panel.active { display: block; }
+    .legal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+    .legal-close {
+      flex-shrink: 0;
+      width: 2rem; height: 2rem;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 0.5rem;
+      color: rgba(245,242,236,0.4);
+      background: rgba(184,150,90,0.08);
+      border: 1px solid rgba(184,150,90,0.15);
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .legal-close:hover { color: #D4AD72; background: rgba(184,150,90,0.16); }
+    .legal-body { color: rgba(245,242,236,0.62); font-size: 0.85rem; line-height: 1.7; }
+    .legal-body p { margin-bottom: 1rem; }
+    .legal-body p:last-child { margin-bottom: 0; }
+    .legal-link { color: #B8965A; text-decoration: underline; text-underline-offset: 3px; }
+    .legal-link:hover { color: #D4AD72; }
+
+    .contact-card {
+      display: flex; align-items: center; gap: 0.9rem;
+      background: rgba(184,150,90,0.07);
+      border: 1px solid rgba(184,150,90,0.22);
+      border-radius: 0.75rem;
+      padding: 1rem 1.1rem;
+      text-decoration: none;
+      transition: all 0.18s;
+    }
+    .contact-card:hover { background: rgba(184,150,90,0.13); border-color: rgba(184,150,90,0.4); }
+    .contact-icon {
+      width: 2.5rem; height: 2.5rem;
+      border-radius: 0.625rem;
+      background: rgba(184,150,90,0.15);
+      color: #D4AD72;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .legal-modal { animation: none; }
+    }
   </style>
 </head>
 <body class="antialiased min-h-screen">
@@ -473,8 +542,93 @@
         Your responses are used solely to generate an advisory risk assessment for the landlord listed on this application. Homeresi does not sell or share your personal data with third parties.
       </p>
 
+      <!-- Legal footer -->
+      <div class="flex items-center justify-center gap-5 mt-6 mb-2">
+        <button onclick="openLegalModal('privacy')" class="text-cream-off/30 hover:text-gold-muted text-xs transition-colors">Privacy Policy</button>
+        <span class="text-cream-off/15 text-xs">·</span>
+        <button onclick="openLegalModal('terms')" class="text-cream-off/30 hover:text-gold-muted text-xs transition-colors">Terms of Service</button>
+        <span class="text-cream-off/15 text-xs">·</span>
+        <button onclick="openLegalModal('contact')" class="text-cream-off/30 hover:text-gold-muted text-xs transition-colors">Contact</button>
+      </div>
+
     </div>
   </main>
+
+  <!-- ══════════ LEGAL MODALS ══════════ -->
+  <div id="legalOverlay" class="legal-overlay" onclick="closeLegalModal(event)">
+    <div class="legal-modal" onclick="event.stopPropagation()">
+
+      <!-- Privacy Policy -->
+      <div id="legal-privacy" class="legal-panel">
+        <div class="legal-header">
+          <div>
+            <p class="badge text-gold-muted mb-1.5">Legal</p>
+            <h2 class="font-display text-2xl text-cream-off font-semibold">Privacy Policy</h2>
+          </div>
+          <button onclick="closeLegalModal()" class="legal-close" aria-label="Close">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="legal-body">
+          <p>Homeresi is committed to protecting the privacy of every landlord and prospective tenant who uses our platform.</p>
+          <p>All information submitted through our forms — including professional, financial, and residential background details — is securely stored and processed using <strong class="text-cream-off">Firebase Firestore</strong>, a Google Cloud infrastructure protected by industry-standard encryption in transit and at rest.</p>
+          <p>We use the data you provide strictly to generate the <strong class="text-cream-off">Homeresi Trust Score Report</strong> requested by the landlord. We do not sell, rent, or trade your personal information to third parties, advertisers, or data brokers under any circumstances.</p>
+          <p>Access to submitted data is limited to the purposes of report generation and customer support. Tenants are never asked to provide protected information such as race, religion, national origin, familial status, or disability status, in line with our Fair Housing Act compliant questionnaire design.</p>
+          <p>If you wish to request a copy of your data, ask for its deletion, or have any privacy-related questions, please contact us at <a href="mailto:homeresicom@gmail.com" class="legal-link">homeresicom@gmail.com</a>.</p>
+        </div>
+      </div>
+
+      <!-- Terms of Service -->
+      <div id="legal-terms" class="legal-panel">
+        <div class="legal-header">
+          <div>
+            <p class="badge text-gold-muted mb-1.5">Legal</p>
+            <h2 class="font-display text-2xl text-cream-off font-semibold">Terms of Service</h2>
+          </div>
+          <button onclick="closeLegalModal()" class="legal-close" aria-label="Close">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="legal-body">
+          <p>Homeresi is an <strong class="text-cream-off">advisory screening assistant</strong>, not a credit bureau, consumer reporting agency, or legal service provider.</p>
+          <p>The Trust Score Reports generated by Homeresi are based entirely on the declarations and information voluntarily submitted by the prospective tenant through our questionnaire. These reports are intended to provide landlords with supplementary, advisory context and <strong class="text-cream-off">do not constitute a formal legal background check, credit report, or tenant screening report</strong> as defined under the Fair Credit Reporting Act (FCRA) or any equivalent regulation.</p>
+          <p>By using Homeresi, both landlords and tenants agree to provide accurate, truthful, and complete information. Submitting false or misleading declarations may result in an inaccurate report and is solely the responsibility of the person who submitted the data.</p>
+          <p>Homeresi makes no guarantee regarding the outcome of any tenancy, lease agreement, or rental decision made using our reports. Landlords remain solely responsible for complying with all applicable fair housing, anti-discrimination, and tenant screening laws in their jurisdiction.</p>
+          <p>We reserve the right to update these terms at any time. Continued use of Homeresi after changes are published constitutes acceptance of the revised terms.</p>
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div id="legal-contact" class="legal-panel">
+        <div class="legal-header">
+          <div>
+            <p class="badge text-gold-muted mb-1.5">Get in Touch</p>
+            <h2 class="font-display text-2xl text-cream-off font-semibold">Contact Us</h2>
+          </div>
+          <button onclick="closeLegalModal()" class="legal-close" aria-label="Close">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="legal-body">
+          <p class="mb-6">Have a question about this questionnaire, a technical issue, or a privacy request? Our team is happy to help.</p>
+
+          <a href="mailto:homeresicom@gmail.com" class="contact-card">
+            <div class="contact-icon">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            <div>
+              <p class="text-cream-off/40 text-xs uppercase tracking-wide mb-0.5">Email Support</p>
+              <p class="text-cream-off text-sm font-medium" style="font-family:'JetBrains Mono',monospace;">homeresicom@gmail.com</p>
+            </div>
+            <svg class="w-4 h-4 text-gold-muted ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+          </a>
+
+          <p class="text-cream-off/30 text-xs mt-6 leading-relaxed">We typically respond within 24 hours on business days.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <script>
     // ── Firebase initialisation ────────────────────────────────────────────────
@@ -537,6 +691,22 @@
     }
 
     loadApplication();
+
+    // ── Legal modal controls ──────────────────────────────────────────────────
+    function openLegalModal(panel) {
+      document.querySelectorAll('.legal-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('legal-' + panel).classList.add('active');
+      document.getElementById('legalOverlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeLegalModal(e) {
+      if (e && e.target.id !== 'legalOverlay') return;
+      document.getElementById('legalOverlay').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLegalModal({ target: { id: 'legalOverlay' } });
+    });
 
     // ── Show/hide the dispute context textarea based on Yes/No toggle ─────────
     document.querySelectorAll('input[name="landlordDispute"]').forEach(input => {
