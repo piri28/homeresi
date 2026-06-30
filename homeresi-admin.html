@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
- <script type="module">
+  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -25,23 +25,27 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
 
-  // Authorized admin emails list
-  const allowedAdmins = ["admin@homeresi.com", "muhammetpiri28@gmail.com"]; 
+  // Authorized admin emails list (Updated with your active email)
+  const allowedAdmins = ["muhammetpiri28@gmail.com"]; 
 
-  // Intercept and hide the HTML content immediately before rendering
+  // Enforce absolute privacy by blocking page render initially
   document.documentElement.style.display = 'none';
 
   onAuthStateChanged(auth, (user) => {
-    if (user && allowedAdmins.includes(user.email)) {
-      // User is verified, grant access and display the panel
-      document.documentElement.style.display = 'block';
-    } else {
-      // User is not signed in or not authorized, redirect to login page
-      window.location.href = 'homeresi-login.html';
+    if (user && user.email) {
+      const userEmailLower = user.email.toLowerCase().trim();
+      
+      if (allowedAdmins.includes(userEmailLower)) {
+        // Access verified, unlock the interface
+        document.documentElement.style.display = 'block';
+        return;
+      }
     }
+    
+    // Fallback: If verification fails, forcefully evict to login screen
+    window.location.href = 'homeresi-login.html';
   });
 </script>
-
   <script>
     tailwind.config = {
       theme: {
