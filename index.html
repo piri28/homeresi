@@ -490,5 +490,36 @@
         </div>
     </div>
 </div>
+  <!-- Modal Open/Close JavaScript Logic -->
+<script>
+function openModal(id) {
+    const targetModal = document.getElementById(id);
+    if (targetModal) {
+        targetModal.classList.remove('hidden');
+        targetModal.classList.add('flex');
+        document.body.style.overflow = 'hidden'; // Prevents background scrolling
+    }
+}
+
+function closeModal(id) {
+    const targetModal = document.getElementById(id);
+    if (targetModal) {
+        targetModal.classList.remove('flex');
+        targetModal.classList.add('hidden');
+        document.body.style.overflow = ''; // Restores background scrolling
+    }
+}
+
+// Close modals automatically when clicking outside the modal content window
+window.addEventListener('click', function(event) {
+    const modalIds = ['privacyModal', 'termsModal', 'contactModal'];
+    modalIds.forEach(id => {
+        const targetModal = document.getElementById(id);
+        if (event.target === targetModal) {
+            closeModal(id);
+        }
+    });
+});
+</script>
 </body>
 </html>
