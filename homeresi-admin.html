@@ -13,9 +13,11 @@
   body { display: none !important; }
 </style>
 
-<!-- Load Firebase Compat Libraries to feed your existing Firestore code below -->
+<!-- Load Firebase Compat Libraries to feed your existing Firestore -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<!-- FIX: Added missing Firestore library to resolve the loading loop -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
   // Global Firebase Configuration
@@ -28,18 +30,20 @@
     appId: "1:447512997027:web:cbf6bccb9ae28a509f2316"
   };
 
-  // Initialize Firebase using the Compat mode so below scripts won't break
+  // Initialize Firebase using the Compat mode
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
 
   const auth = firebase.auth();
+  const db = firebase.firestore(); // This resolves the db.collection calls below
+
   const allowedAdmins = ["muhammetpiri28@gmail.com"];
 
   auth.onAuthStateChanged((user) => {
     if (user && user.email) {
       const userEmailLower = user.email.toLowerCase().trim();
-      
+
       if (allowedAdmins.includes(userEmailLower)) {
         // Access verified: Uncover the admin layout
         const styleElement = document.getElementById('auth-gate-style');
@@ -47,7 +51,7 @@
         return;
       }
     }
-    
+
     // Evict illegal or unauthenticated attempts
     window.location.href = 'homeresi-login.html';
   });
