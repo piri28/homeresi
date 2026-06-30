@@ -8,16 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
- <!-- Robust Security Guard using CSS and Firebase Auth -->
+  <!-- Enhanced Security Gate with Firebase v9 Compat Support -->
 <style id="auth-gate-style">
   body { display: none !important; }
 </style>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+<!-- Load Firebase Compat Libraries to feed your existing Firestore code below -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
+<script>
+  // Global Firebase Configuration
   const firebaseConfig = {
     apiKey: "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
     authDomain: "homeresi-new.firebaseapp.com",
@@ -27,27 +28,27 @@
     appId: "1:447512997027:web:cbf6bccb9ae28a509f2316"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+  // Initialize Firebase using the Compat mode so below scripts won't break
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
 
-  // Whitelisted administrator email
+  const auth = firebase.auth();
   const allowedAdmins = ["muhammetpiri28@gmail.com"];
 
-  onAuthStateChanged(auth, (user) => {
+  auth.onAuthStateChanged((user) => {
     if (user && user.email) {
       const userEmailLower = user.email.toLowerCase().trim();
       
       if (allowedAdmins.includes(userEmailLower)) {
-        // Access granted: Remove the CSS block to reveal the page
+        // Access verified: Uncover the admin layout
         const styleElement = document.getElementById('auth-gate-style');
         if (styleElement) styleElement.remove();
-        console.log("Access granted for admin:", userEmailLower);
         return;
       }
     }
     
-    // Access denied or unauthenticated: Force redirect to login page
-    console.log("Access denied. Redirecting to login...");
+    // Evict illegal or unauthenticated attempts
     window.location.href = 'homeresi-login.html';
   });
 </script>
