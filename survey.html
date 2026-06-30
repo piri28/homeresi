@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homeresi — Tenant Questionnaire</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Firebase Compat SDK v9 — most reliable for inline scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-ink':    '#0F1623',
+            'navy-deep':    '#162035',
+            'navy-card':    '#1C2A42',
+            'gold-muted':   '#B8965A',
+            'gold-light':   '#D4AD72',
+            'cream-off':    '#F5F2EC',
+            'green-signal': '#2D6A4F',
+            'green-light':  '#40916C',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'Georgia', 'serif'],
+            body:    ['Inter', 'system-ui', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #0F1623; color: #F5F2EC; font-family: 'Inter', sans-serif; }
+
+    .field {
+      background: #1C2A42;
+      border: 1px solid rgba(184,150,90,0.18);
+      color: #F5F2EC;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      font-size: 0.875rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .field::placeholder { color: rgba(245,242,236,0.3); }
+    .field:focus {
+      border-color: rgba(184,150,90,0.65);
+      box-shadow: 0 0 0 3px rgba(184,150,90,0.1);
+    }
+    .field:focus-visible { outline: none; }
+    select.field option { background: #1C2A42; color: #F5F2EC; }
+    .field.error {
+      border-color: rgba(220,38,38,0.7) !important;
+      box-shadow: 0 0 0 3px rgba(220,38,38,0.1) !important;
+    }
+
+    .card {
+      background: linear-gradient(145deg, #162035 0%, #0F1623 100%);
+      border: 1px solid rgba(184,150,90,0.18);
+      border-radius: 1.25rem;
+    }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.63rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid rgba(15,22,35,0.25);
+      border-top-color: #0F1623;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .fade-in { animation: fadeIn 0.35s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Section number badge */
+    .section-num {
+      width: 2.25rem; height: 2.25rem;
+      border-radius: 0.625rem;
+      background: rgba(184,150,90,0.12);
+      border: 1px solid rgba(184,150,90,0.25);
+      color: #B8965A;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Yes/No toggle */
+    .toggle-group { display: flex; gap: 0.625rem; }
+    .toggle-label { cursor: pointer; flex: 1; }
+    .toggle-input { display: none; }
+    .toggle-btn {
+      display: flex; align-items: center; justify-content: center;
+      padding: 0.7rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(184,150,90,0.2);
+      color: rgba(245,242,236,0.5);
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #1C2A42;
+      transition: all 0.18s;
+      user-select: none;
+      text-align: center;
+    }
+    .toggle-input:checked + .toggle-btn {
+      background: rgba(184,150,90,0.15);
+      border-color: #B8965A;
+      color: #D4AD72;
+    }
+
+    /* Consent box */
+    .consent-box {
+      background: rgba(184,150,90,0.06);
+      border: 1px solid rgba(184,150,90,0.25);
+      border-radius: 0.75rem;
+    }
+    .consent-box.error {
+      border-color: rgba(220,38,38,0.6);
+      background: rgba(220,38,38,0.06);
+    }
+
+    /* Progress bar */
+    .progress-track {
+      height: 4px;
+      background: rgba(184,150,90,0.12);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #B8965A, #D4AD72);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    #loadingState, #errorState, #alreadySubmittedState, #confirmation, #surveyForm { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in { animation: none; }
+      .spinner { animation: none; }
+      .progress-fill { transition: none; }
+    }
+  </style>
+</head>
+<body class="antialiased min-h-screen">
+
+  <!-- NAV -->
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-ink/90 backdrop-blur-md border-b border-gold-muted/15">
+    <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
+      <span class="flex items-center gap-3">
+        <span class="text-gold-muted font-display text-xl tracking-tight font-semibold">Homeresi</span>
+        <span class="badge text-gold-muted bg-gold-muted/10 px-2 py-0.5 rounded">Tenant Questionnaire</span>
+      </span>
+      <div class="flex items-center gap-2 text-cream-off/40 text-xs">
+        <svg class="w-3.5 h-3.5 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span>256-bit encrypted · Confidential</span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-24 pb-20 px-4">
+    <div class="max-w-2xl mx-auto">
+
+      <!-- ══ LOADING STATE ══ -->
+      <div id="loadingState" class="text-center py-24">
+        <div class="spinner mx-auto mb-4" style="width:2rem;height:2rem;border-width:3px;border-color:rgba(184,150,90,0.2);border-top-color:#B8965A;"></div>
+        <p class="text-cream-off/40 text-sm">Loading your questionnaire…</p>
+      </div>
+
+      <!-- ══ ERROR STATE (invalid or missing ID) ══ -->
+      <div id="errorState" class="card p-10 text-center fade-in">
+        <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+          style="background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.35);">
+          <svg class="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+          </svg>
+        </div>
+        <h2 class="font-display text-2xl text-cream-off font-bold mb-2">Link not found</h2>
+        <p class="text-cream-off/50 text-sm leading-relaxed max-w-sm mx-auto">
+          This survey link is invalid or has expired. Please contact the landlord who sent you this link and ask them to generate a new one.
+        </p>
+      </div>
+
+      <!-- ══ ALREADY SUBMITTED STATE ══ -->
+      <div id="alreadySubmittedState" class="card p-10 text-center fade-in">
+        <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+          style="background:rgba(45,106,79,0.15);border:1px solid rgba(45,106,79,0.4);">
+          <svg class="w-7 h-7 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <h2 class="font-display text-2xl text-cream-off font-bold mb-2">Already submitted</h2>
+        <p class="text-cream-off/50 text-sm leading-relaxed max-w-sm mx-auto">
+          This questionnaire has already been completed. The landlord has been notified and their report is being prepared.
+        </p>
+      </div>
+
+      <!-- ══ SURVEY FORM ══ -->
+      <div id="surveyForm">
+
+        <div class="text-center mb-8">
+          <p class="badge text-gold-muted mb-3">Prospective Tenant Questionnaire</p>
+          <h1 class="font-display text-3xl md:text-4xl text-cream-off font-bold mb-3">
+            Tell Us About Yourself
+          </h1>
+          <p class="text-cream-off/50 text-sm max-w-md mx-auto leading-relaxed">
+            This questionnaire helps generate an AI Trust Score Report for the landlord. It takes about 4 minutes and complies with the Fair Housing Act.
+          </p>
+        </div>
+
+        <!-- Progress -->
+        <div class="mb-8">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-cream-off/35 text-xs uppercase tracking-wide" id="progressLabel">Section 1 of 4</span>
+            <span class="text-gold-muted text-xs font-mono" id="progressPercent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Fair Housing notice -->
+        <div class="flex items-start gap-3 mb-8 p-4 rounded-lg"
+          style="background:rgba(45,106,79,0.08);border:1px solid rgba(45,106,79,0.25);">
+          <svg class="w-4 h-4 text-green-light flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+          <p class="text-green-light text-xs leading-relaxed">
+            <strong>Fair Housing Act compliant.</strong> This form only asks for information relevant to financial and rental qualification. We never ask about race, religion, national origin, familial status, disability, or other protected characteristics.
+          </p>
+        </div>
+
+        <div class="card p-8 md:p-10 space-y-10">
+
+          <!-- ══ SECTION 1: Professional & Financial Background ══ -->
+          <section>
+            <div class="flex items-center gap-3 mb-6">
+              <div class="section-num">01</div>
+              <h2 class="font-display text-xl text-cream-off font-semibold">Professional &amp; Financial Background</h2>
+            </div>
+
+            <div class="space-y-5">
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Current Employment Status <span class="text-gold-muted">*</span></label>
+                <select id="employmentStatus" class="field">
+                  <option value="" disabled selected>Select status</option>
+                  <option>Full-time Employee</option>
+                  <option>Business Owner</option>
+                  <option>Freelancer</option>
+                  <option>Student</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Job Title &amp; Industry <span class="text-gold-muted">*</span></label>
+                <input id="jobTitleIndustry" type="text" class="field" placeholder="e.g. Product Manager, Technology" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Monthly Net Income Range <span class="text-gold-muted">*</span></label>
+                <select id="incomeRange" class="field">
+                  <option value="" disabled selected>Select range</option>
+                  <option>Below $2,500</option>
+                  <option>$2,500 - $5,000</option>
+                  <option>$5,000 - $7,500</option>
+                  <option>$7,500+</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Employment Duration <span class="text-gold-muted">*</span></label>
+                <select id="employmentDuration" class="field">
+                  <option value="" disabled selected>Select duration</option>
+                  <option>Less than 1 year</option>
+                  <option>1-3 years</option>
+                  <option>3+ years</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Highest Education Level <span class="text-cream-off/25">(Optional)</span></label>
+                <select id="educationLevel" class="field">
+                  <option value="" selected>Prefer not to say</option>
+                  <option>High School</option>
+                  <option>Bachelor's Degree</option>
+                  <option>Master's/PhD</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <div class="border-t border-gold-muted/10"></div>
+
+          <!-- ══ SECTION 2: Residential History ══ -->
+          <section>
+            <div class="flex items-center gap-3 mb-6">
+              <div class="section-num">02</div>
+              <h2 class="font-display text-xl text-cream-off font-semibold">Residential History</h2>
+            </div>
+
+            <div class="space-y-5">
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Previous Residence City &amp; State/District <span class="text-gold-muted">*</span></label>
+                <input id="previousResidence" type="text" class="field" placeholder="e.g. Austin, Texas" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">How long did you live at your last residence? <span class="text-gold-muted">*</span></label>
+                <select id="residenceDuration" class="field">
+                  <option value="" disabled selected>Select duration</option>
+                  <option>Less than 1 year</option>
+                  <option>1-2 years</option>
+                  <option>2+ years</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Primary Reason for Moving Out <span class="text-gold-muted">*</span></label>
+                <select id="reasonForMoving" class="field">
+                  <option value="" disabled selected>Select reason</option>
+                  <option>Relocation for work</option>
+                  <option>Need a different space</option>
+                  <option>Current lease ending</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-2 uppercase tracking-wide">Have you ever experienced a legal dispute or severe disagreement with a previous landlord? <span class="text-gold-muted">*</span></label>
+                <div class="toggle-group">
+                  <label class="toggle-label">
+                    <input type="radio" name="landlordDispute" value="No" class="toggle-input" />
+                    <span class="toggle-btn">No</span>
+                  </label>
+                  <label class="toggle-label">
+                    <input type="radio" name="landlordDispute" value="Yes" class="toggle-input" />
+                    <span class="toggle-btn">Yes</span>
+                  </label>
+                </div>
+                <div id="disputeContextWrap" class="mt-3" style="display:none;">
+                  <textarea id="disputeContext" class="field" rows="3" placeholder="Briefly describe what happened…"></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="border-t border-gold-muted/10"></div>
+
+          <!-- ══ SECTION 3: Household & Lifestyle Details ══ -->
+          <section>
+            <div class="flex items-center gap-3 mb-6">
+              <div class="section-num">03</div>
+              <h2 class="font-display text-xl text-cream-off font-semibold">Household &amp; Lifestyle Details</h2>
+            </div>
+
+            <div class="space-y-5">
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-2 uppercase tracking-wide">Do any of the occupants smoke inside the property? <span class="text-gold-muted">*</span></label>
+                <div class="toggle-group">
+                  <label class="toggle-label">
+                    <input type="radio" name="smoking" value="No" class="toggle-input" />
+                    <span class="toggle-btn">No</span>
+                  </label>
+                  <label class="toggle-label">
+                    <input type="radio" name="smoking" value="Yes" class="toggle-input" />
+                    <span class="toggle-btn">Yes</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Do you have any pets? <span class="text-cream-off/25">(Excluding certified service/support animals)</span> <span class="text-gold-muted">*</span></label>
+                <select id="pets" class="field">
+                  <option value="" disabled selected>Select an option</option>
+                  <option>No</option>
+                  <option>Yes (Dog)</option>
+                  <option>Yes (Cat)</option>
+                  <option>Yes (Other)</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <div class="border-t border-gold-muted/10"></div>
+
+          <!-- ══ SECTION 4: Verification & Authorization ══ -->
+          <section>
+            <div class="flex items-center gap-3 mb-6">
+              <div class="section-num">04</div>
+              <h2 class="font-display text-xl text-cream-off font-semibold">Verification &amp; Authorization</h2>
+            </div>
+
+            <div class="space-y-5">
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Additional Context or References for the Landlord <span class="text-cream-off/25">(Optional)</span></label>
+                <textarea id="additionalContext" class="field" rows="4" placeholder="e.g. Happy to provide references from prior landlords or employer upon request…"></textarea>
+                <p class="text-cream-off/25 text-xs mt-1.5">Max 800 characters.</p>
+              </div>
+
+              <div id="consentBox" class="consent-box p-4">
+                <label class="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" id="consentCheckbox" class="mt-0.5 w-4 h-4 flex-shrink-0 accent-gold-muted" />
+                  <span class="text-cream-off/70 text-xs leading-relaxed">
+                    I hereby declare that the information provided above is accurate and true. I authorize Homeresi to analyze this data to generate a Trust Score Report for my prospective landlord. <span class="text-gold-muted">*</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <!-- Error banner -->
+          <div id="errorBanner" class="hidden p-4 rounded-lg text-xs leading-relaxed"
+            style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.35);color:#f87171;">
+            <strong>Submission failed.</strong> Please check your connection and try again. If the problem persists, contact the landlord who sent you this link.
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button id="submitBtn" onclick="handleSubmit()"
+              class="flex items-center gap-2.5 bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-8 py-4 rounded-lg transition-colors text-sm shadow-lg shadow-gold-muted/10">
+              <svg id="submitIcon" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M5 13l4 4L19 7"/>
+              </svg>
+              <span id="submitLabel">Submit Questionnaire</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+      <!-- END SURVEY FORM -->
+
+      <!-- ══ CONFIRMATION VIEW ══ -->
+      <div id="confirmation" class="card p-10 text-center fade-in">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
+          style="background:rgba(45,106,79,0.2);border:1px solid rgba(45,106,79,0.4);">
+          <svg class="w-8 h-8 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <p class="badge text-green-light mb-3">Questionnaire Submitted</p>
+        <h2 class="font-display text-3xl text-cream-off font-bold mb-3">Thank you. You're all set.</h2>
+        <p class="text-cream-off/50 text-sm max-w-sm mx-auto leading-relaxed">
+          Your responses have been securely submitted. The landlord has been notified and will receive their
+          <strong class="text-cream-off">Homeresi Trust Score Report</strong> shortly.
+        </p>
+      </div>
+
+      <p class="text-center text-cream-off/25 text-xs mt-10 max-w-md mx-auto leading-relaxed">
+        Your responses are used solely to generate an advisory risk assessment for the landlord listed on this application. Homeresi does not sell or share your personal data with third parties.
+      </p>
+
+    </div>
+  </main>
+
+  <script>
+    // ── Firebase initialisation ────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+      authDomain:        "homeresi-new.firebaseapp.com",
+      projectId:         "homeresi-new",
+      storageBucket:     "homeresi-new.firebasestorage.app",
+      messagingSenderId: "447512997027",
+      appId:             "1:447512997027:web:cbf6bccb9ae28a509f2316"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ── Read the application ID from the URL query string ─────────────────────
+    const urlParams     = new URLSearchParams(window.location.search);
+    const applicationId = urlParams.get('id');
+
+    let applicationRef = null;
+
+    // ── View switching helper ──────────────────────────────────────────────────
+    function showView(id) {
+      ['loadingState', 'errorState', 'alreadySubmittedState', 'surveyForm', 'confirmation'].forEach(v => {
+        document.getElementById(v).style.display = (v === id) ? (v === 'surveyForm' ? 'block' : 'block') : 'none';
+      });
+    }
+
+    // ── Validate the ID exists and load the linked document ───────────────────
+    async function loadApplication() {
+      if (!applicationId) {
+        console.error('No application ID found in URL.');
+        showView('errorState');
+        return;
+      }
+
+      try {
+        applicationRef = db.collection('applications').doc(applicationId);
+        const docSnap   = await applicationRef.get();
+
+        if (!docSnap.exists) {
+          console.error('No application found for ID:', applicationId);
+          showView('errorState');
+          return;
+        }
+
+        const data = docSnap.data();
+
+        // Prevent re-submission if the tenant has already completed the survey
+        if (data.status === 'submitted' || data.tenantData) {
+          console.log('Survey already completed for this application.');
+          showView('alreadySubmittedState');
+          return;
+        }
+
+        showView('surveyForm');
+      } catch (err) {
+        console.error('Failed to load application:', err);
+        showView('errorState');
+      }
+    }
+
+    loadApplication();
+
+    // ── Show/hide the dispute context textarea based on Yes/No toggle ─────────
+    document.querySelectorAll('input[name="landlordDispute"]').forEach(input => {
+      input.addEventListener('change', () => {
+        const wrap = document.getElementById('disputeContextWrap');
+        wrap.style.display = (input.value === 'Yes' && input.checked) ? 'block' : 'none';
+      });
+    });
+
+    // ── Live progress bar based on answered required fields ────────────────────
+    const REQUIRED_FIELDS = [
+      'employmentStatus', 'jobTitleIndustry', 'incomeRange', 'employmentDuration',
+      'previousResidence', 'residenceDuration', 'reasonForMoving',
+      'pets'
+    ];
+    const REQUIRED_RADIOS = ['landlordDispute', 'smoking'];
+
+    function updateProgress() {
+      let answered = 0;
+      const total = REQUIRED_FIELDS.length + REQUIRED_RADIOS.length + 1; // +1 for consent
+
+      REQUIRED_FIELDS.forEach(id => {
+        if (document.getElementById(id).value.trim()) answered++;
+      });
+      REQUIRED_RADIOS.forEach(name => {
+        if (document.querySelector(`input[name="${name}"]:checked`)) answered++;
+      });
+      if (document.getElementById('consentCheckbox').checked) answered++;
+
+      const pct = Math.round((answered / total) * 100);
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressPercent').textContent = pct + '%';
+
+      let section = 1;
+      if (answered >= 5) section = 2;
+      if (answered >= 8) section = 3;
+      if (answered >= 9) section = 4;
+      document.getElementById('progressLabel').textContent = `Section ${section} of 4`;
+    }
+
+    document.addEventListener('input', updateProgress);
+    document.addEventListener('change', updateProgress);
+
+    // ── Required field IDs for final validation ─────────────────────────────────
+    const ALL_REQUIRED_SELECTS = REQUIRED_FIELDS;
+
+    function clearFieldError(id) {
+      document.getElementById(id)?.classList.remove('error');
+    }
+    ALL_REQUIRED_SELECTS.forEach(id => {
+      document.getElementById(id)?.addEventListener('input', () => clearFieldError(id));
+      document.getElementById(id)?.addEventListener('change', () => clearFieldError(id));
+    });
+
+    function validateSurvey() {
+      let valid = true;
+
+      ALL_REQUIRED_SELECTS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el.value.trim()) {
+          el.classList.add('error');
+          valid = false;
+        } else {
+          el.classList.remove('error');
+        }
+      });
+
+      REQUIRED_RADIOS.forEach(name => {
+        if (!document.querySelector(`input[name="${name}"]:checked`)) {
+          valid = false;
+        }
+      });
+
+      const consentBox = document.getElementById('consentBox');
+      if (!document.getElementById('consentCheckbox').checked) {
+        consentBox.classList.add('error');
+        valid = false;
+      } else {
+        consentBox.classList.remove('error');
+      }
+
+      if (!valid) alert('Please complete all required fields marked with * and accept the consent declaration before submitting.');
+      return valid;
+    }
+
+    // ── Button loading state ──────────────────────────────────────────────────
+    function setLoading(on) {
+      const btn   = document.getElementById('submitBtn');
+      const label = document.getElementById('submitLabel');
+      btn.disabled = on;
+      if (on) {
+        document.getElementById('submitIcon').outerHTML = '<span id="submitIcon" class="spinner"></span>';
+        label.textContent = 'Sending…';
+      } else {
+        document.getElementById('submitIcon').outerHTML =
+          '<svg id="submitIcon" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>';
+        label.textContent = 'Submit Questionnaire';
+      }
+    }
+
+    function showError(show) {
+      document.getElementById('errorBanner').classList.toggle('hidden', !show);
+    }
+
+    function radioValue(name) {
+      const checked = document.querySelector(`input[name="${name}"]:checked`);
+      return checked ? checked.value : null;
+    }
+
+    // ── Main submit handler — updates the existing Firestore document ─────────
+    async function handleSubmit() {
+      showError(false);
+      if (!validateSurvey()) return;
+      setLoading(true);
+
+      try {
+        const tenantData = {
+          // Section 1
+          employmentStatus:   document.getElementById('employmentStatus').value,
+          jobTitleIndustry:   document.getElementById('jobTitleIndustry').value.trim(),
+          incomeRange:        document.getElementById('incomeRange').value,
+          employmentDuration: document.getElementById('employmentDuration').value,
+          educationLevel:     document.getElementById('educationLevel').value || null,
+
+          // Section 2
+          previousResidence:  document.getElementById('previousResidence').value.trim(),
+          residenceDuration:  document.getElementById('residenceDuration').value,
+          reasonForMoving:    document.getElementById('reasonForMoving').value,
+          landlordDispute:    radioValue('landlordDispute'),
+          disputeContext:     radioValue('landlordDispute') === 'Yes'
+                                 ? document.getElementById('disputeContext').value.trim()
+                                 : null,
+
+          // Section 3
+          smokesIndoors:      radioValue('smoking'),
+          pets:                document.getElementById('pets').value,
+
+          // Section 4
+          additionalContext:  document.getElementById('additionalContext').value.trim(),
+          consentGiven:       document.getElementById('consentCheckbox').checked,
+
+          submittedAt:        firebase.firestore.FieldValue.serverTimestamp(),
+        };
+
+        // Update the same document the landlord created, do not overwrite landlord/property data
+        await applicationRef.update({
+          tenantData,
+          status: 'submitted',
+        });
+
+        console.log('Tenant survey saved successfully for application:', applicationId);
+
+        document.getElementById('surveyForm').style.display = 'none';
+        showView('confirmation');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      } catch (err) {
+        console.error('Firestore update failed:', err);
+        setLoading(false);
+        showError(true);
+      }
+    }
+  </script>
+
+</body>
+</html>
