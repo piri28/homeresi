@@ -9,9 +9,38 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-  <!-- Firebase Compat SDK v9 — most reliable for inline scripts -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+ <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+    authDomain: "homeresi-new.firebaseapp.com",
+    projectId: "homeresi-new",
+    storageBucket: "homeresi-new.firebasestorage.app",
+    messagingSenderId: "447512997027",
+    appId: "1:447512997027:web:cbf6bccb9ae28a509f2316"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // Authorized admin emails list
+  const allowedAdmins = ["admin@homeresi.com", "leonardodicaprio@gmail.com"]; 
+
+  // Intercept and hide the HTML content immediately before rendering
+  document.documentElement.style.display = 'none';
+
+  onAuthStateChanged(auth, (user) => {
+    if (user && allowedAdmins.includes(user.email)) {
+      // User is verified, grant access and display the panel
+      document.documentElement.style.display = 'block';
+    } else {
+      // User is not signed in or not authorized, redirect to login page
+      window.location.href = 'homeresi-login.html';
+    }
+  });
+</script>
 
   <script>
     tailwind.config = {
