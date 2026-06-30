@@ -9,7 +9,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-  <script type="module">
+ <!-- Robust Security Guard using CSS and Firebase Auth -->
+<style id="auth-gate-style">
+  body { display: none !important; }
+</style>
+
+<script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -25,24 +30,24 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
 
-  // Authorized admin emails list (Updated with your active email)
-  const allowedAdmins = ["muhammetpiri28@gmail.com"]; 
-
-  // Enforce absolute privacy by blocking page render initially
-  document.documentElement.style.display = 'none';
+  // Whitelisted administrator email
+  const allowedAdmins = ["muhammetpiri28@gmail.com"];
 
   onAuthStateChanged(auth, (user) => {
     if (user && user.email) {
       const userEmailLower = user.email.toLowerCase().trim();
       
       if (allowedAdmins.includes(userEmailLower)) {
-        // Access verified, unlock the interface
-        document.documentElement.style.display = 'block';
+        // Access granted: Remove the CSS block to reveal the page
+        const styleElement = document.getElementById('auth-gate-style');
+        if (styleElement) styleElement.remove();
+        console.log("Access granted for admin:", userEmailLower);
         return;
       }
     }
     
-    // Fallback: If verification fails, forcefully evict to login screen
+    // Access denied or unauthenticated: Force redirect to login page
+    console.log("Access denied. Redirecting to login...");
     window.location.href = 'homeresi-login.html';
   });
 </script>
