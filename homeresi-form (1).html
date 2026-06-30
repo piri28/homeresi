@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homeresi — Create Tenant Survey</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Firebase Compat SDK v9 — most reliable for inline scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-ink':    '#0F1623',
+            'navy-deep':    '#162035',
+            'navy-card':    '#1C2A42',
+            'gold-muted':   '#B8965A',
+            'gold-light':   '#D4AD72',
+            'cream-off':    '#F5F2EC',
+            'green-signal': '#2D6A4F',
+            'green-light':  '#40916C',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'Georgia', 'serif'],
+            body:    ['Inter', 'system-ui', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #0F1623; color: #F5F2EC; font-family: 'Inter', sans-serif; }
+
+    .field {
+      background: #1C2A42;
+      border: 1px solid rgba(184,150,90,0.18);
+      color: #F5F2EC;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      font-size: 0.875rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .field::placeholder { color: rgba(245,242,236,0.3); }
+    .field:focus {
+      border-color: rgba(184,150,90,0.65);
+      box-shadow: 0 0 0 3px rgba(184,150,90,0.1);
+    }
+    .field:focus-visible { outline: none; }
+    select.field option { background: #1C2A42; color: #F5F2EC; }
+    .field.error {
+      border-color: rgba(220,38,38,0.7) !important;
+      box-shadow: 0 0 0 3px rgba(220,38,38,0.1) !important;
+    }
+
+    .card {
+      background: linear-gradient(145deg, #162035 0%, #0F1623 100%);
+      border: 1px solid rgba(184,150,90,0.18);
+      border-radius: 1.25rem;
+    }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.63rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid rgba(15,22,35,0.25);
+      border-top-color: #0F1623;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .how-step { display: flex; align-items: flex-start; gap: 1rem; }
+    .how-num {
+      width: 2rem; height: 2rem;
+      border-radius: 50%;
+      background: rgba(184,150,90,0.12);
+      border: 1px solid rgba(184,150,90,0.25);
+      color: #B8965A;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    #confirmation { display: none; }
+
+    .link-box {
+      display: flex;
+      align-items: center;
+      background: #0F1623;
+      border: 1px solid rgba(184,150,90,0.3);
+      border-radius: 0.625rem;
+      overflow: hidden;
+    }
+    .link-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #D4AD72;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      padding: 0.875rem 1rem;
+      min-width: 0;
+    }
+    .copy-btn {
+      flex-shrink: 0;
+      background: rgba(184,150,90,0.12);
+      border-left: 1px solid rgba(184,150,90,0.2);
+      color: #B8965A;
+      padding: 0.875rem 1.1rem;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      font-size: 0.75rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      border-top: none; border-right: none; border-bottom: none;
+    }
+    .copy-btn:hover { background: rgba(184,150,90,0.22); color: #D4AD72; }
+    .copy-btn.copied { background: rgba(45,106,79,0.2); color: #40916C; }
+
+    .fade-in { animation: fadeIn 0.35s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in { animation: none; }
+      .spinner { animation: none; }
+    }
+  </style>
+</head>
+<body class="antialiased min-h-screen">
+
+  <!-- NAV -->
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-ink/90 backdrop-blur-md border-b border-gold-muted/15">
+    <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
+      <a href="homeresi.html" class="flex items-center gap-3">
+        <span class="text-gold-muted font-display text-xl tracking-tight font-semibold">Homeresi</span>
+        <span class="badge text-gold-muted bg-gold-muted/10 px-2 py-0.5 rounded">AI Screening</span>
+      </a>
+      <div class="flex items-center gap-2 text-cream-off/40 text-xs">
+        <svg class="w-3.5 h-3.5 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span>256-bit encrypted · Confidential</span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-24 pb-20 px-4">
+    <div class="max-w-2xl mx-auto">
+
+      <!-- ══ FORM VIEW ══ -->
+      <div id="formView">
+
+        <div class="text-center mb-10">
+          <p class="badge text-gold-muted mb-3">For Landlords</p>
+          <h1 class="font-display text-3xl md:text-4xl text-cream-off font-bold mb-3">
+            Create Your Tenant Survey Link
+          </h1>
+          <p class="text-cream-off/50 text-sm max-w-sm mx-auto leading-relaxed">
+            Fill in your details below. We'll instantly generate a private link you can send directly to your prospective tenant.
+          </p>
+        </div>
+
+        <!-- How it works -->
+        <div class="card p-6 mb-8">
+          <p class="badge text-gold-muted mb-5">How It Works</p>
+          <div class="space-y-5">
+            <div class="how-step">
+              <div class="how-num">01</div>
+              <div>
+                <p class="text-cream-off text-sm font-medium mb-0.5">Enter your details &amp; property info</p>
+                <p class="text-cream-off/40 text-xs leading-relaxed">We capture your information so we know who to deliver the final report to.</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-num">02</div>
+              <div>
+                <p class="text-cream-off text-sm font-medium mb-0.5">Receive a unique, private survey link</p>
+                <p class="text-cream-off/40 text-xs leading-relaxed">A one-time questionnaire URL tied exclusively to your application is generated.</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-num">03</div>
+              <div>
+                <p class="text-cream-off text-sm font-medium mb-0.5">Send the link — receive your report</p>
+                <p class="text-cream-off/40 text-xs leading-relaxed">Your tenant completes the FHA-compliant questionnaire. Your AI Trust Score Report is emailed to you within 4 hours.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form card -->
+        <div class="card p-8 md:p-10">
+
+          <div class="mb-7">
+            <h2 class="font-display text-2xl text-cream-off font-semibold mb-1">Your Details</h2>
+            <p class="text-cream-off/45 text-sm">Strictly confidential — used only to deliver your AI Risk Report.</p>
+          </div>
+
+          <div class="space-y-5">
+
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Full Name <span class="text-gold-muted">*</span></label>
+              <input id="landlordName" type="text" class="field" placeholder="e.g. Alexandra Kowalski" autocomplete="name" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Email Address <span class="text-gold-muted">*</span></label>
+              <input id="landlordEmail" type="email" class="field" placeholder="you@example.com" autocomplete="email" />
+              <p class="text-cream-off/30 text-xs mt-1.5">Your AI Risk Report PDF will be delivered to this address.</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Phone Number <span class="text-gold-muted">*</span></label>
+              <input id="landlordPhone" type="tel" class="field" placeholder="+1 (555) 000-0000" autocomplete="tel" />
+            </div>
+
+            <div class="border-t border-gold-muted/10 pt-5">
+              <h3 class="font-display text-lg text-cream-off font-semibold mb-4">Property Information</h3>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Property Type <span class="text-gold-muted">*</span></label>
+              <select id="propertyType" class="field">
+                <option value="" disabled selected>Select type</option>
+                <option>Apartment / Flat</option>
+                <option>Detached House</option>
+                <option>Villa / Estate</option>
+                <option>Penthouse</option>
+                <option>Townhouse</option>
+                <option>Commercial Unit</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Monthly Rent <span class="text-gold-muted">*</span></label>
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cream-off/35 text-sm select-none">$</span>
+                  <input id="rentalPrice" type="number" min="0" class="field pl-7" placeholder="3,500" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Est. Property Value</label>
+                <div class="relative">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cream-off/35 text-sm select-none">$</span>
+                  <input id="propertyValue" type="number" min="0" class="field pl-7" placeholder="800,000" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Property Location <span class="text-gold-muted">*</span></label>
+              <input id="propertyLocation" type="text" class="field" placeholder="City, State / Country" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Desired Lease Duration</label>
+              <select id="leaseDuration" class="field">
+                <option value="" disabled selected>Select duration</option>
+                <option>6 months</option>
+                <option>12 months</option>
+                <option>18 months</option>
+                <option>24 months</option>
+                <option>24+ months / Long-term</option>
+              </select>
+            </div>
+
+          </div>
+
+          <!-- Error banner -->
+          <div id="errorBanner" class="hidden mt-5 p-4 rounded-lg text-xs leading-relaxed"
+            style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.35);color:#f87171;">
+            <strong>Submission failed.</strong> Please check your connection and try again. If the problem persists, contact support.
+          </div>
+
+          <div class="mt-8 flex justify-end">
+            <button id="submitBtn" onclick="handleSubmit()"
+              class="flex items-center gap-2.5 bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-8 py-4 rounded-lg transition-colors text-sm shadow-lg shadow-gold-muted/10">
+              <svg id="btnIcon" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+              </svg>
+              <span id="btnLabel">Generate Survey Link</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+      <!-- END FORM VIEW -->
+
+
+      <!-- ══ CONFIRMATION VIEW ══ -->
+      <div id="confirmation" class="fade-in">
+
+        <div class="card p-8 md:p-10 mb-6">
+          <div class="flex items-center gap-4 mb-8">
+            <div class="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
+              style="background:rgba(45,106,79,0.15);border:1px solid rgba(45,106,79,0.4);">
+              <svg class="w-7 h-7 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/>
+              </svg>
+            </div>
+            <div>
+              <p class="badge text-green-light mb-1">Survey Link Ready</p>
+              <h2 class="font-display text-2xl text-cream-off font-bold">Send this link to your tenant</h2>
+            </div>
+          </div>
+
+          <p class="text-cream-off/55 text-sm leading-relaxed mb-6">
+            Your unique survey has been created. Copy the link below and send it to your prospective tenant.
+            Once they complete the questionnaire, your <strong class="text-cream-off">Homeresi Trust Score Report</strong>
+            will be emailed to you within <strong class="text-cream-off">4 hours</strong>.
+          </p>
+
+          <div class="mb-6">
+            <label class="block text-xs font-medium text-cream-off/50 mb-2 uppercase tracking-wide">Tenant Survey URL</label>
+            <div class="link-box">
+              <input id="surveyLinkInput" type="text" readonly />
+              <button class="copy-btn" id="copyBtn" onclick="copyLink()">Copy</button>
+            </div>
+            <p class="text-cream-off/30 text-xs mt-2">This link is unique to this application. Do not share it publicly.</p>
+          </div>
+
+          <div class="border-t border-gold-muted/10 my-6"></div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="rounded-xl p-4" style="background:rgba(28,42,66,0.6);">
+              <p class="text-cream-off/35 text-xs mb-1.5 uppercase tracking-wide">Report Delivered To</p>
+              <p class="text-cream-off text-sm font-medium truncate" style="font-family:'JetBrains Mono',monospace;" id="confirmEmail">—</p>
+            </div>
+            <div class="rounded-xl p-4" style="background:rgba(28,42,66,0.6);">
+              <p class="text-cream-off/35 text-xs mb-1.5 uppercase tracking-wide">Estimated Delivery</p>
+              <p class="text-cream-off text-sm font-medium">Within 4 hours of tenant submission</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Next steps -->
+        <div class="card p-6 mb-6">
+          <p class="badge text-gold-muted mb-4">Next Steps</p>
+          <div class="space-y-4">
+            <div class="how-step">
+              <div class="how-num" style="background:rgba(45,106,79,0.15);border-color:rgba(45,106,79,0.35);color:#40916C;font-size:0.8rem;">✓</div>
+              <div>
+                <p class="text-green-light text-sm font-medium">Survey link created</p>
+                <p class="text-cream-off/40 text-xs">Your application is saved securely in our system.</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-num">02</div>
+              <div>
+                <p class="text-cream-off text-sm font-medium">Send the link to your tenant</p>
+                <p class="text-cream-off/40 text-xs">Share via email, WhatsApp, or any messaging platform.</p>
+              </div>
+            </div>
+            <div class="how-step">
+              <div class="how-num">03</div>
+              <div>
+                <p class="text-cream-off text-sm font-medium">Receive your AI Risk Report</p>
+                <p class="text-cream-off/40 text-xs">Once your tenant submits, your Homeresi Trust Score Report arrives by email within 4 hours.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center">
+          <a href="homeresi.html" class="text-gold-muted hover:text-gold-light text-sm transition-colors underline underline-offset-4">
+            ← Return to Homeresi
+          </a>
+        </div>
+
+      </div>
+      <!-- END CONFIRMATION VIEW -->
+
+      <p class="text-center text-cream-off/25 text-xs mt-10 max-w-md mx-auto leading-relaxed">
+        By submitting this form you acknowledge that Homeresi reports are advisory risk assessments only and do not constitute legal advice. Homeresi bears no liability for lease outcomes.
+      </p>
+
+    </div>
+  </main>
+
+  <script>
+    // ── Firebase initialisation ────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+      authDomain:        "homeresi-new.firebaseapp.com",
+      projectId:         "homeresi-new",
+      storageBucket:     "homeresi-new.firebasestorage.app",
+      messagingSenderId: "447512997027",
+      appId:             "1:447512997027:web:cbf6bccb9ae28a509f2316"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ── Generate a cryptographically random 16-char hex ID ────────────────────
+    function generateId() {
+      const arr = new Uint8Array(8);
+      crypto.getRandomValues(arr);
+      return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // ── Required field IDs ────────────────────────────────────────────────────
+    const REQUIRED = ['landlordName', 'landlordEmail', 'landlordPhone', 'propertyType', 'rentalPrice', 'propertyLocation'];
+
+    // Clear error style on user input
+    REQUIRED.forEach(id => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        document.getElementById(id)?.classList.remove('error');
+      });
+    });
+
+    function validateForm() {
+      let valid = true;
+      REQUIRED.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el.value.trim()) {
+          el.classList.add('error');
+          valid = false;
+        } else {
+          el.classList.remove('error');
+        }
+      });
+      if (!valid) alert('Please complete all required fields marked with * before continuing.');
+      return valid;
+    }
+
+    // ── Button loading state ──────────────────────────────────────────────────
+    function setLoading(on) {
+      const btn   = document.getElementById('submitBtn');
+      const label = document.getElementById('btnLabel');
+      btn.disabled = on;
+      if (on) {
+        document.getElementById('btnIcon').outerHTML = '<span id="btnIcon" class="spinner"></span>';
+        label.textContent = 'Creating link…';
+      } else {
+        document.getElementById('btnIcon').outerHTML =
+          `<svg id="btnIcon" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>`;
+        label.textContent = 'Generate Survey Link';
+      }
+    }
+
+    function showError(show) {
+      document.getElementById('errorBanner').classList.toggle('hidden', !show);
+    }
+
+    // ── Build absolute survey.html URL ────────────────────────────────────────
+    function buildSurveyUrl(id) {
+      const base = window.location.href.replace(/\/[^/]*(\?.*)?$/, '/');
+      return `${base}survey.html?id=${id}`;
+    }
+
+    // ── Main submit handler ───────────────────────────────────────────────────
+    async function handleSubmit() {
+      showError(false);
+      if (!validateForm()) return;
+      setLoading(true);
+
+      try {
+        const applicationId = generateId();
+        const surveyLink    = buildSurveyUrl(applicationId);
+
+        const applicationData = {
+          applicationId,
+          landlord: {
+            name:  document.getElementById('landlordName').value.trim(),
+            email: document.getElementById('landlordEmail').value.trim(),
+            phone: document.getElementById('landlordPhone').value.trim(),
+          },
+          property: {
+            type:           document.getElementById('propertyType').value,
+            monthlyRent:    Number(document.getElementById('rentalPrice').value) || null,
+            estimatedValue: Number(document.getElementById('propertyValue').value) || null,
+            location:       document.getElementById('propertyLocation').value.trim(),
+            leaseDuration:  document.getElementById('leaseDuration').value || null,
+          },
+          surveyLink,
+          status:     'awaiting_tenant',   // updated to 'submitted' when tenant completes survey
+          tenantData: null,                // populated by survey.html on submission
+          createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+        };
+
+        // Use the generated ID as the Firestore document ID for direct lookup
+        await db.collection('applications').doc(applicationId).set(applicationData);
+        console.log('Application created in Firestore with ID:', applicationId);
+
+        // Show the confirmation screen
+        document.getElementById('surveyLinkInput').value           = surveyLink;
+        document.getElementById('confirmEmail').textContent        = applicationData.landlord.email;
+        document.getElementById('formView').style.display          = 'none';
+        document.getElementById('confirmation').style.display      = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      } catch (err) {
+        console.error('Firestore write failed:', err);
+        setLoading(false);
+        showError(true);
+      }
+    }
+
+    // ── Copy survey link to clipboard ─────────────────────────────────────────
+    async function copyLink() {
+      const val = document.getElementById('surveyLinkInput').value;
+      const btn = document.getElementById('copyBtn');
+      try {
+        await navigator.clipboard.writeText(val);
+      } catch {
+        // Fallback for browsers without Clipboard API
+        const tmp = document.createElement('textarea');
+        tmp.value = val;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        document.body.removeChild(tmp);
+      }
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2500);
+    }
+  </script>
+
+</body>
+</html>
