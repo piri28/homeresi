@@ -55,29 +55,7 @@
     // Evict illegal or unauthenticated attempts
     window.location.href = 'homeresi-login.html';
   });
-  // Function to handle the tenant screening payment process
-function handleTenantScreeningPayment() {
-  // Get the tenant email value from your input field
-  // Replace 'YOUR_TENANT_EMAIL_INPUT_ID' with the actual ID of your email input field
-  const tenantEmail = document.getElementById('YOUR_TENANT_EMAIL_INPUT_ID').value;
-  
-  if (!tenantEmail) {
-    alert("Please enter a tenant email address.");
-    return;
-  }
-
-  // Your Lemon Squeezy test checkout link
-  const lemonSqueezyLink = "https://homeresi.lemonsqueezy.com/checkout/buy/39ad8207-1d11-49a8-ba53-34ad2b492cac?discount=0";
-  
-  // Create the return URL pointing to your success page, carrying the tenant's email as a parameter
-  const successUrl = window.location.origin + /homeresi-success.html?tenant=${encodeURIComponent(tenantEmail)};
-  
-  // Append the redirect URL parameter so Lemon Squeezy knows where to send the user after a successful payment
-  const finalRedirectUrl = ${lemonSqueezyLink}&checkout[redirect_url]=${encodeURIComponent(successUrl)};
-  
-  // Redirect the landlord to the secure Lemon Squeezy payment checkout page
-  window.location.href = finalRedirectUrl;
-}
+ 
 </script>
   <script>
     tailwind.config = {
