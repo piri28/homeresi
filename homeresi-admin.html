@@ -199,10 +199,18 @@
           <span class="w-1.5 h-1.5 rounded-full bg-green-light inline-block animate-pulse"></span>
           Live
         </span>
-        <a href="#" onclick="handleTenantScreeningPayment(); return false;" class="bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-4 py-2 rounded-lg transition-colors">
-  + New Request
-</a>
-      </div>
+       <a href="#" onclick="handleTenantScreeningPayment(); return false;" class="bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-4 py-2 rounded-lg transition-colors">
+            + New Request
+          </a>
+          <button onclick="(() => {
+            const email = prompt('Please enter the tenant\'s email address to send the screening request:');
+            if (!email) return;
+            const link = 'https://homeresi.lemonsqueezy.com/checkout/buy/39ad8207-1d11-49a8-ba53-34ad2b492cac?discount=0';
+            const success = window.location.origin + '/homeresi-success.html?tenant=' + encodeURIComponent(email);
+            window.location.href = link + '&checkout[redirect_url]' + '=' + encodeURIComponent(success);
+          })()" class="bg-amber-mid hover:bg-gold-light text-slate-ink font-semibold px-4 py-2 rounded-lg transition-colors ml-2">
+            + Test Payment
+          </button>
     </header>
 
     <main class="flex-1 p-6">
