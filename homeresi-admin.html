@@ -796,4 +796,29 @@ Status: ${statusLabel(r.status)}`;
     }
   </script>
 </body>
+  <script>
+// This function is completely isolated to prevent any layout or authentication crashes
+function handleTenantScreeningPayment() {
+  // We will prompt the landlord for the email address directly via a clean browser popup
+  const tenantEmail = prompt("Please enter the tenant's email address to send the screening request:");
+  
+  if (!tenantEmail) {
+    // If the landlord clicks cancel or leaves it empty, stop the execution softly
+    return;
+  }
+
+  // Your verified Lemon Squeezy checkout link
+  const lemonSqueezyLink = "https://homeresi.lemonsqueezy.com/checkout/buy/39ad8207-1d11-49a8-ba53-34ad2b492cac?discount=0";
+  
+  // Building the return pathway
+  const successUrl = window.location.origin + /homeresi-success.html?tenant=${encodeURIComponent(tenantEmail)};
+  const finalRedirectUrl = ${lemonSqueezyLink}&checkout[redirect_url]=${encodeURIComponent(successUrl)};
+  
+  // Off to the payment gateway!
+  window.location.href = finalRedirectUrl;
+}
+</script>
+
+</body>
+</html>
 </html>
