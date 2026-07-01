@@ -263,7 +263,7 @@
             disabled
             class="btn-primary"
           >
-            <span id="actionBtnLabel">Please wait…</span>
+            <span id="actionBtnLabel">Processing Database Record...</span>
           </button>
           <button
             onclick="window.location.href='homeresi-form.html'"
@@ -306,7 +306,7 @@
     const displayEmail = document.getElementById('displayEmail');
 
     // ── Helper: render the success state ──────────────────────────────────────
-    function showSyncSuccess(tenantEmail) {
+    function showSyncSuccess(tenantEmail, docId) {
       // Update the status row
       syncRow.classList.add('synced');
       syncIcon.outerHTML = `
@@ -316,10 +316,12 @@
       syncText.style.color = '#40916C';
       syncText.textContent = `Success! The screening request for ${tenantEmail} has been logged.`;
 
-      // Re-enable and update the action button
+      // Re-enable and update the action button — pass the new document ID back to the form
       actionBtn.disabled = false;
-      actionLabel.textContent = 'Return to Dashboard';
-      actionBtn.onclick = () => { window.location.href = 'homeresi-admin.html'; };
+      actionLabel.textContent = 'One Last Step — Get Your Link';
+      actionBtn.onclick = () => {
+        window.location.href = `homeresi-form.html?step=2&id=${docId}`;
+      };
     }
 
     // ── Helper: render the error state ────────────────────────────────────────
@@ -350,8 +352,8 @@
         'No tenant email found in the payment link. The request was not logged automatically — please add it manually from your dashboard.';
 
       actionBtn.disabled = false;
-      actionLabel.textContent = 'Go to Dashboard';
-      actionBtn.onclick = () => { window.location.href = 'homeresi-admin.html'; };
+      actionLabel.textContent = 'Return to Form';
+      actionBtn.onclick = () => { window.location.href = 'homeresi-form.html'; };
     }
 
     // ── Main initialisation logic ──────────────────────────────────────────────
@@ -370,17 +372,17 @@
         return;
       }
 
-      // Write the new document to Firestore
+      // Write the new document to Firestore and capture the generated document ID
       try {
-        await db.collection('requests').add({
+        const docRef = await db.collection('requests').add({
           tenantEmail:   tenantEmail,
           status:        'awaiting_tenant',
           paymentStatus: 'completed',
           createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
         });
 
-        console.log('Screening request logged successfully for:', tenantEmail);
-        showSyncSuccess(tenantEmail);
+        console.log('Screening request logged successfully. Document ID:', docRef.id);
+        showSyncSuccess(tenantEmail, docRef.id);
 
       } catch (error) {
         console.error('Firestore write failed:', error);
