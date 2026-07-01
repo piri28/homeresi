@@ -225,7 +225,7 @@
   <!-- NAV -->
   <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-ink/90 backdrop-blur-md border-b border-gold-muted/15">
     <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
-      <a href="/" class="flex items-center gap-3">
+      <a href="homeresi.html" class="flex items-center gap-3">
         <span class="text-gold-muted font-display text-xl tracking-tight font-semibold">Homeresi</span>
         <span class="badge text-gold-muted bg-gold-muted/10 px-2 py-0.5 rounded">AI Screening</span>
       </a>
@@ -458,7 +458,7 @@
         </div>
 
         <div class="text-center">
-          <a href="/" class="text-gold-muted hover:text-gold-light text-sm transition-colors underline underline-offset-4">
+          <a href="homeresi.html" class="text-gold-muted hover:text-gold-light text-sm transition-colors underline underline-offset-4">
             ← Return to Homeresi
           </a>
         </div>
@@ -677,6 +677,33 @@
         showError(true);
       }
     }
+
+    // ── URL-parameter routing: handle redirect from homeresi-success.html ────
+    // When the landlord arrives via ?step=2&id=FIRESTORE_ID (sent by the success
+    // page after a Lemon Squeezy payment), skip the form entirely and show the
+    // confirmation view with the pre-built survey link injected.
+    document.addEventListener('DOMContentLoaded', () => {
+      const params  = new URLSearchParams(window.location.search);
+      const step    = params.get('step');
+      const urlId   = params.get('id');
+
+      if (step === '2' && urlId) {
+        // Build the canonical survey URL using the Firestore document ID
+        const surveyUrl = `https://www.homeresi.com/survey.html?id=${urlId}`;
+
+        // Inject the link into the copy-box input
+        document.getElementById('surveyLinkInput').value = surveyUrl;
+
+        // Hide the form, show the confirmation card
+        document.getElementById('formView').style.display     = 'none';
+        document.getElementById('confirmation').style.display = 'block';
+
+        // Scroll to top so the confirmation card is the first thing visible
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        console.log('Step-2 routing: showing confirmation view for ID', urlId);
+      }
+    });
 
     // ── Legal modal controls ──────────────────────────────────────────────────
     function openLegalModal(panel) {
