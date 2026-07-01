@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homeresi — Payment Successful</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Firebase Compat SDK v9 — required for inline script usage -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-ink':    '#0F1623',
+            'navy-deep':    '#162035',
+            'navy-card':    '#1C2A42',
+            'gold-muted':   '#B8965A',
+            'gold-light':   '#D4AD72',
+            'cream-off':    '#F5F2EC',
+            'green-signal': '#2D6A4F',
+            'green-light':  '#40916C',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'Georgia', 'serif'],
+            body:    ['Inter', 'system-ui', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html, body {
+      background-color: #0F1623;
+      color: #F5F2EC;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Animated checkmark ── */
+    .check-circle {
+      width: 5rem;
+      height: 5rem;
+      border-radius: 50%;
+      background: rgba(45, 106, 79, 0.18);
+      border: 1.5px solid rgba(64, 145, 108, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: circlePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes circlePop {
+      from { transform: scale(0.5); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    .check-icon {
+      animation: checkDraw 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) 0.25s both;
+    }
+    @keyframes checkDraw {
+      from { transform: scale(0) rotate(-15deg); opacity: 0; }
+      to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+    }
+
+    /* ── Card ── */
+    .success-card {
+      background: linear-gradient(145deg, #1C2A42 0%, #162035 100%);
+      border: 1px solid rgba(184, 150, 90, 0.18);
+      border-radius: 1.25rem;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(184,150,90,0.06);
+    }
+
+    /* ── Typography ── */
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    /* ── Divider ── */
+    .rule { border-top: 1px solid rgba(184, 150, 90, 0.14); }
+
+    /* ── Sync status row ── */
+    .status-row {
+      background: rgba(184, 150, 90, 0.06);
+      border: 1px solid rgba(184, 150, 90, 0.16);
+      border-radius: 0.625rem;
+      padding: 0.875rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .status-row.synced {
+      background: rgba(45, 106, 79, 0.12);
+      border-color: rgba(64, 145, 108, 0.3);
+    }
+    .status-row.error {
+      background: rgba(155, 35, 53, 0.1);
+      border-color: rgba(155, 35, 53, 0.35);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 1.1rem;
+      height: 1.1rem;
+      border: 2px solid rgba(184, 150, 90, 0.2);
+      border-top-color: #B8965A;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Primary button ── */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: #B8965A;
+      color: #0F1623;
+      font-weight: 600;
+      font-size: 0.875rem;
+      padding: 0.875rem 2rem;
+      border-radius: 0.625rem;
+      transition: background 0.18s, transform 0.12s;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn-primary:hover  { background: #D4AD72; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled {
+      opacity: 0.55;
+      cursor: default;
+      transform: none;
+    }
+
+    /* ── Subtle second button ── */
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      color: rgba(245, 242, 236, 0.4);
+      font-size: 0.8rem;
+      padding: 0.625rem 1.25rem;
+      border-radius: 0.5rem;
+      transition: color 0.18s;
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+    }
+    .btn-ghost:hover { color: rgba(245, 242, 236, 0.75); }
+
+    /* ── Slide-up entrance for card ── */
+    .fade-up {
+      animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .check-circle, .check-icon, .fade-up, .spinner { animation: none; }
+    }
+  </style>
+</head>
+<body class="antialiased flex flex-col min-h-screen">
+
+  <!-- NAV -->
+  <nav class="border-b border-gold-muted/12 bg-slate-ink/80 backdrop-blur-md sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <span class="flex items-center gap-3">
+        <span class="font-display text-xl text-gold-muted font-semibold tracking-tight">Homeresi</span>
+        <span class="badge text-gold-muted bg-gold-muted/10 px-2 py-0.5 rounded">AI Screening</span>
+      </span>
+      <div class="flex items-center gap-1.5 text-cream-off/35 text-xs">
+        <svg class="w-3.5 h-3.5 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span>256-bit encrypted · Secure payment</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="flex-1 flex items-center justify-center px-4 py-16">
+    <div class="w-full max-w-md fade-up">
+
+      <!-- Success card -->
+      <div class="success-card p-8 md:p-10">
+
+        <!-- Animated checkmark -->
+        <div class="flex flex-col items-center text-center mb-8">
+          <div class="check-circle mb-6">
+            <svg class="check-icon w-9 h-9 text-green-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+
+          <p class="badge text-green-light bg-green-signal/15 px-3 py-1 rounded-full mb-4">Payment Confirmed</p>
+          <h1 class="font-display text-3xl text-cream-off font-bold mb-3 leading-snug">
+            You're all set.
+          </h1>
+          <p class="text-cream-off/50 text-sm leading-relaxed max-w-xs">
+            Your Homeresi screening request has been activated. Your tenant's survey link is being prepared.
+          </p>
+        </div>
+
+        <!-- Divider -->
+        <div class="rule mb-6"></div>
+
+        <!-- Order summary -->
+        <div class="mb-6 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/40 text-xs">Product</span>
+            <span class="text-cream-off text-xs font-medium">Homeresi Trust Score Report</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/40 text-xs">Tenant Email</span>
+            <span id="displayEmail" class="text-cream-off text-xs font-mono truncate max-w-[55%] text-right">—</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/40 text-xs">Payment Status</span>
+            <span class="badge text-green-light bg-green-signal/15 px-2 py-0.5 rounded">Completed</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cream-off/40 text-xs">Report Delivery</span>
+            <span class="text-cream-off text-xs">Within 4 hours</span>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="rule mb-6"></div>
+
+        <!-- Sync status row -->
+        <div id="syncRow" class="status-row mb-6">
+          <!-- Content injected by JS -->
+          <span id="syncIcon" class="spinner"></span>
+          <span id="syncText" class="text-cream-off/55 text-xs leading-relaxed">
+            Syncing transaction data with your dashboard…
+          </span>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="space-y-2.5">
+          <button
+            id="actionBtn"
+            disabled
+            class="btn-primary"
+          >
+            <span id="actionBtnLabel">Please wait…</span>
+          </button>
+          <button
+            onclick="window.location.href='homeresi-form.html'"
+            class="btn-ghost"
+          >
+            ← Back to Screening Request Form
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Footer note -->
+      <p class="text-center text-cream-off/20 text-xs mt-8 leading-relaxed">
+        A copy of this transaction has been logged to your dashboard. For support, contact
+        <a href="mailto:homeresicom@gmail.com" class="text-gold-muted/60 hover:text-gold-muted transition-colors underline underline-offset-2">homeresicom@gmail.com</a>
+      </p>
+
+    </div>
+  </main>
+
+  <script>
+    // ── Firebase initialisation ────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+      authDomain:        "homeresi-new.firebaseapp.com",
+      projectId:         "homeresi-new",
+      storageBucket:     "homeresi-new.firebasestorage.app",
+      messagingSenderId: "447512997027",
+      appId:             "1:447512997027:web:cbf6bccb9ae28a509f2316"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ── UI element references ──────────────────────────────────────────────────
+    const syncRow      = document.getElementById('syncRow');
+    const syncIcon     = document.getElementById('syncIcon');
+    const syncText     = document.getElementById('syncText');
+    const actionBtn    = document.getElementById('actionBtn');
+    const actionLabel  = document.getElementById('actionBtnLabel');
+    const displayEmail = document.getElementById('displayEmail');
+
+    // ── Helper: render the success state ──────────────────────────────────────
+    function showSyncSuccess(tenantEmail) {
+      // Update the status row
+      syncRow.classList.add('synced');
+      syncIcon.outerHTML = `
+        <svg id="syncIcon" class="w-4 h-4 text-green-light flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>`;
+      syncText.style.color = '#40916C';
+      syncText.textContent = `Success! The screening request for ${tenantEmail} has been logged.`;
+
+      // Re-enable and update the action button
+      actionBtn.disabled = false;
+      actionLabel.textContent = 'Return to Dashboard';
+      actionBtn.onclick = () => { window.location.href = 'homeresi-admin.html'; };
+    }
+
+    // ── Helper: render the error state ────────────────────────────────────────
+    function showSyncError(message) {
+      syncRow.classList.add('error');
+      syncIcon.outerHTML = `
+        <svg id="syncIcon" class="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>`;
+      syncText.style.color = '#f87171';
+      syncText.textContent = message;
+
+      // Still allow navigation to dashboard even on sync failure
+      actionBtn.disabled = false;
+      actionLabel.textContent = 'Continue to Dashboard';
+      actionBtn.onclick = () => { window.location.href = 'homeresi-admin.html'; };
+    }
+
+    // ── Helper: render the missing-email state ────────────────────────────────
+    function showMissingEmail() {
+      syncRow.classList.add('error');
+      syncIcon.outerHTML = `
+        <svg id="syncIcon" class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+        </svg>`;
+      syncText.style.color = '#fbbf24';
+      syncText.textContent =
+        'No tenant email found in the payment link. The request was not logged automatically — please add it manually from your dashboard.';
+
+      actionBtn.disabled = false;
+      actionLabel.textContent = 'Go to Dashboard';
+      actionBtn.onclick = () => { window.location.href = 'homeresi-admin.html'; };
+    }
+
+    // ── Main initialisation logic ──────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Extract tenant email from the URL query string: ?tenant=email@example.com
+      const params      = new URLSearchParams(window.location.search);
+      const tenantEmail = params.get('tenant')?.trim() || '';
+
+      // Populate the order summary row
+      displayEmail.textContent = tenantEmail || 'Not provided';
+
+      // Guard: no email present
+      if (!tenantEmail) {
+        console.warn('No tenant email found in URL query string.');
+        showMissingEmail();
+        return;
+      }
+
+      // Write the new document to Firestore
+      try {
+        await db.collection('requests').add({
+          tenantEmail:   tenantEmail,
+          status:        'awaiting_tenant',
+          paymentStatus: 'completed',
+          createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
+        });
+
+        console.log('Screening request logged successfully for:', tenantEmail);
+        showSyncSuccess(tenantEmail);
+
+      } catch (error) {
+        console.error('Firestore write failed:', error);
+        showSyncError(
+          'The payment was successful, but we could not sync the request to your dashboard automatically. Please log it manually or contact support.'
+        );
+      }
+    });
+  </script>
+
+</body>
+</html>
