@@ -41,6 +41,7 @@
     html { scroll-behavior: smooth; }
     body { background-color: #0F1623; color: #F5F2EC; font-family: 'Inter', sans-serif; }
 
+    /* ── Form inputs ── */
     .field {
       background: #1C2A42;
       border: 1px solid rgba(184,150,90,0.18);
@@ -65,12 +66,14 @@
       box-shadow: 0 0 0 3px rgba(220,38,38,0.1) !important;
     }
 
+    /* ── Card ── */
     .card {
       background: linear-gradient(145deg, #162035 0%, #0F1623 100%);
       border: 1px solid rgba(184,150,90,0.18);
       border-radius: 1.25rem;
     }
 
+    /* ── Badge ── */
     .badge {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.63rem;
@@ -79,17 +82,16 @@
       display: inline-block;
     }
 
+    /* ── Spinner (used inside the processing overlay) ── */
     .spinner {
-      width: 1rem; height: 1rem;
-      border: 2px solid rgba(15,22,35,0.25);
-      border-top-color: #0F1623;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: spin 0.75s linear infinite;
       display: inline-block;
       flex-shrink: 0;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── How-it-works steps ── */
     .how-step { display: flex; align-items: flex-start; gap: 1rem; }
     .how-num {
       width: 2rem; height: 2rem;
@@ -105,8 +107,7 @@
       margin-top: 0.1rem;
     }
 
-    #confirmation { display: none; }
-
+    /* ── Step 2 link copy box ── */
     .link-box {
       display: flex;
       align-items: center;
@@ -139,16 +140,32 @@
       font-weight: 500;
       border-top: none; border-right: none; border-bottom: none;
     }
-    .copy-btn:hover { background: rgba(184,150,90,0.22); color: #D4AD72; }
-    .copy-btn.copied { background: rgba(45,106,79,0.2); color: #40916C; }
+    .copy-btn:hover  { background: rgba(184,150,90,0.22); color: #D4AD72; }
+    .copy-btn.copied { background: rgba(45,106,79,0.2);   color: #40916C; }
 
-    .fade-in { animation: fadeIn 0.35s ease both; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    /* ── Views ── */
+    #confirmation     { display: none; }
+    #dbErrorBanner    { display: none; }
 
-    @media (prefers-reduced-motion: reduce) {
-      .fade-in { animation: none; }
-      .spinner { animation: none; }
+    /* ── Processing overlay (shown while Firestore write runs) ── */
+    #processingOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10,14,22,0.88);
+      backdrop-filter: blur(8px);
+      z-index: 80;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      padding: 2rem;
     }
+    #processingOverlay.active { display: flex; }
+
+    /* ── Fade-up entrance for Step 2 ── */
+    .fade-in { animation: fadeIn 0.38s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
     /* ── Legal modal ── */
     .legal-overlay {
@@ -175,19 +192,17 @@
       animation: legalIn 0.22s ease;
     }
     @keyframes legalIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-    .legal-panel { display: none; padding: 2rem; }
+    .legal-panel        { display: none; padding: 2rem; }
     .legal-panel.active { display: block; }
     .legal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
     .legal-close {
-      flex-shrink: 0;
-      width: 2rem; height: 2rem;
+      flex-shrink: 0; width: 2rem; height: 2rem;
       display: flex; align-items: center; justify-content: center;
       border-radius: 0.5rem;
       color: rgba(245,242,236,0.4);
       background: rgba(184,150,90,0.08);
       border: 1px solid rgba(184,150,90,0.15);
-      transition: all 0.15s;
-      cursor: pointer;
+      transition: all 0.15s; cursor: pointer;
     }
     .legal-close:hover { color: #D4AD72; background: rgba(184,150,90,0.16); }
     .legal-body { color: rgba(245,242,236,0.62); font-size: 0.85rem; line-height: 1.7; }
@@ -195,7 +210,6 @@
     .legal-body p:last-child { margin-bottom: 0; }
     .legal-link { color: #B8965A; text-decoration: underline; text-underline-offset: 3px; }
     .legal-link:hover { color: #D4AD72; }
-
     .contact-card {
       display: flex; align-items: center; gap: 0.9rem;
       background: rgba(184,150,90,0.07);
@@ -216,13 +230,26 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .legal-modal { animation: none; }
+      .fade-in, .legal-modal { animation: none; }
+      .spinner { animation: none; }
     }
   </style>
 </head>
 <body class="antialiased min-h-screen">
 
-  <!-- NAV -->
+  <!-- ══ PROCESSING OVERLAY ══════════════════════════════════════════════════ -->
+  <!-- Shown immediately when Lemon Squeezy redirects back with status=success,
+       while the async Firestore write is in progress. -->
+  <div id="processingOverlay">
+    <span class="spinner mb-6"
+      style="width:3rem;height:3rem;border:3px solid rgba(184,150,90,0.18);border-top-color:#B8965A;"></span>
+    <p class="font-display text-2xl text-cream-off font-semibold mb-2">Payment confirmed.</p>
+    <p class="text-cream-off/45 text-sm max-w-xs" id="overlayMsg">
+      Syncing your transaction with Homeresi…
+    </p>
+  </div>
+
+  <!-- ══ NAV ═══════════════════════════════════════════════════════════════ -->
   <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-ink/90 backdrop-blur-md border-b border-gold-muted/15">
     <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
       <a href="homeresi.html" class="flex items-center gap-3">
@@ -238,10 +265,15 @@
     </div>
   </nav>
 
+  <!-- ══ MAIN ═══════════════════════════════════════════════════════════════ -->
   <main class="pt-24 pb-20 px-4">
     <div class="max-w-2xl mx-auto">
 
-      <!-- ══ FORM VIEW ══ -->
+      <!-- ────────────────────────────────────────────────────────────────────
+           STEP 1 — LANDLORD FORM
+           Shown by default. Hidden once Lemon Squeezy redirects back with
+           status=success and the Firestore write completes successfully.
+      ──────────────────────────────────────────────────────────────────────── -->
       <div id="formView">
 
         <div class="text-center mb-10">
@@ -250,7 +282,7 @@
             Create Your Tenant Survey Link
           </h1>
           <p class="text-cream-off/50 text-sm max-w-sm mx-auto leading-relaxed">
-            Fill in your details below. We'll instantly generate a private link you can send directly to your prospective tenant.
+            Fill in your details below. We'll instantly generate a private screening link you can send directly to your prospective tenant.
           </p>
         </div>
 
@@ -268,15 +300,15 @@
             <div class="how-step">
               <div class="how-num">02</div>
               <div>
-                <p class="text-cream-off text-sm font-medium mb-0.5">Receive a unique, private survey link</p>
-                <p class="text-cream-off/40 text-xs leading-relaxed">A one-time questionnaire URL tied exclusively to your application is generated.</p>
+                <p class="text-cream-off text-sm font-medium mb-0.5">Complete a quick, secure payment</p>
+                <p class="text-cream-off/40 text-xs leading-relaxed">You'll be redirected to our secure Lemon Squeezy checkout. Your unique survey link is generated immediately after payment.</p>
               </div>
             </div>
             <div class="how-step">
               <div class="how-num">03</div>
               <div>
                 <p class="text-cream-off text-sm font-medium mb-0.5">Send the link — receive your report</p>
-                <p class="text-cream-off/40 text-xs leading-relaxed">Your tenant completes the FHA-compliant questionnaire. Your AI Trust Score Report is emailed to you within 4 hours.</p>
+                <p class="text-cream-off/40 text-xs leading-relaxed">Your tenant completes the FHA-compliant questionnaire. Your AI Trust Score Report arrives by email within 4 hours.</p>
               </div>
             </div>
           </div>
@@ -292,28 +324,54 @@
 
           <div class="space-y-5">
 
+            <!-- Landlord: Full Name -->
             <div>
-              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Full Name <span class="text-gold-muted">*</span></label>
-              <input id="landlordName" type="text" class="field" placeholder="e.g. Alexandra Kowalski" autocomplete="name" />
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Full Name <span class="text-gold-muted">*</span>
+              </label>
+              <input id="landlordName" type="text" class="field"
+                placeholder="e.g. Alexandra Kowalski" autocomplete="name" />
             </div>
 
+            <!-- Landlord: Email -->
             <div>
-              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Email Address <span class="text-gold-muted">*</span></label>
-              <input id="landlordEmail" type="email" class="field" placeholder="you@example.com" autocomplete="email" />
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Your Email Address <span class="text-gold-muted">*</span>
+              </label>
+              <input id="landlordEmail" type="email" class="field"
+                placeholder="you@example.com" autocomplete="email" />
               <p class="text-cream-off/30 text-xs mt-1.5">Your AI Risk Report PDF will be delivered to this address.</p>
             </div>
 
+            <!-- Landlord: Phone -->
             <div>
-              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Phone Number <span class="text-gold-muted">*</span></label>
-              <input id="landlordPhone" type="tel" class="field" placeholder="+1 (555) 000-0000" autocomplete="tel" />
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Phone Number <span class="text-gold-muted">*</span>
+              </label>
+              <input id="landlordPhone" type="tel" class="field"
+                placeholder="+1 (555) 000-0000" autocomplete="tel" />
             </div>
 
+            <!-- Tenant email (passed to Lemon Squeezy as passthrough) -->
+            <div>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Tenant Email Address <span class="text-gold-muted">*</span>
+              </label>
+              <input id="tenantEmail" type="email" class="field"
+                placeholder="tenant@example.com" />
+              <p class="text-cream-off/30 text-xs mt-1.5">Used to generate the unique screening link for your tenant.</p>
+            </div>
+
+            <!-- Property section divider -->
             <div class="border-t border-gold-muted/10 pt-5">
               <h3 class="font-display text-lg text-cream-off font-semibold mb-4">Property Information</h3>
             </div>
 
+            <!-- Property Type -->
             <div>
-              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Property Type <span class="text-gold-muted">*</span></label>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Property Type <span class="text-gold-muted">*</span>
+              </label>
               <select id="propertyType" class="field">
                 <option value="" disabled selected>Select type</option>
                 <option>Apartment / Flat</option>
@@ -326,16 +384,21 @@
               </select>
             </div>
 
+            <!-- Rent + Property Value -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Monthly Rent <span class="text-gold-muted">*</span></label>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                  Monthly Rent <span class="text-gold-muted">*</span>
+                </label>
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cream-off/35 text-sm select-none">$</span>
                   <input id="rentalPrice" type="number" min="0" class="field pl-7" placeholder="3,500" />
                 </div>
               </div>
               <div>
-                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Est. Property Value</label>
+                <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                  Est. Property Value
+                </label>
                 <div class="relative">
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cream-off/35 text-sm select-none">$</span>
                   <input id="propertyValue" type="number" min="0" class="field pl-7" placeholder="800,000" />
@@ -343,13 +406,19 @@
               </div>
             </div>
 
+            <!-- Location -->
             <div>
-              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Property Location <span class="text-gold-muted">*</span></label>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Property Location <span class="text-gold-muted">*</span>
+              </label>
               <input id="propertyLocation" type="text" class="field" placeholder="City, State / Country" />
             </div>
 
+            <!-- Lease Duration -->
             <div>
-              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">Desired Lease Duration</label>
+              <label class="block text-xs font-medium text-cream-off/60 mb-1.5 uppercase tracking-wide">
+                Desired Lease Duration
+              </label>
               <select id="leaseDuration" class="field">
                 <option value="" disabled selected>Select duration</option>
                 <option>6 months</option>
@@ -362,31 +431,52 @@
 
           </div>
 
-          <!-- Error banner -->
+          <!-- Validation error banner -->
           <div id="errorBanner" class="hidden mt-5 p-4 rounded-lg text-xs leading-relaxed"
             style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.35);color:#f87171;">
-            <strong>Submission failed.</strong> Please check your connection and try again. If the problem persists, contact support.
+            <strong>Please check the form.</strong> Complete all required fields marked with * before continuing.
           </div>
 
-          <div class="mt-8 flex justify-end">
+          <!-- Secure payment note -->
+          <div class="flex items-start gap-2.5 mt-6 p-4 rounded-lg"
+            style="background:rgba(184,150,90,0.06);border:1px solid rgba(184,150,90,0.15);">
+            <svg class="w-4 h-4 text-gold-muted flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <p class="text-cream-off/45 text-xs leading-relaxed">
+              Clicking the button below will redirect you to our <strong class="text-cream-off/70">secure Lemon Squeezy checkout</strong>.
+              Your unique tenant survey link is generated automatically the moment payment is confirmed — no extra steps needed.
+            </p>
+          </div>
+
+          <!-- Submit button -->
+          <div class="mt-6 flex justify-end">
             <button id="submitBtn" onclick="handleSubmit()"
               class="flex items-center gap-2.5 bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-8 py-4 rounded-lg transition-colors text-sm shadow-lg shadow-gold-muted/10">
               <svg id="btnIcon" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
               </svg>
-              <span id="btnLabel">Generate Survey Link</span>
+              <span id="btnLabel">Pay &amp; Generate Survey Link</span>
             </button>
           </div>
 
         </div>
       </div>
-      <!-- END FORM VIEW -->
+      <!-- END STEP 1 -->
 
 
-      <!-- ══ CONFIRMATION VIEW ══ -->
+      <!-- ────────────────────────────────────────────────────────────────────
+           STEP 2 — SURVEY LINK CONFIRMATION
+           Hidden by default. Revealed after the DOMContentLoaded routing
+           block detects status=success in the URL and completes the Firestore
+           write, injecting the generated survey URL into #surveyLinkInput.
+      ──────────────────────────────────────────────────────────────────────── -->
       <div id="confirmation" class="fade-in">
 
+        <!-- Main link card -->
         <div class="card p-8 md:p-10 mb-6">
+
+          <!-- Header -->
           <div class="flex items-center gap-4 mb-8">
             <div class="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
               style="background:rgba(45,106,79,0.15);border:1px solid rgba(45,106,79,0.4);">
@@ -395,19 +485,23 @@
               </svg>
             </div>
             <div>
-              <p class="badge text-green-light mb-1">Survey Link Ready</p>
+              <p class="badge text-green-light mb-1">Payment Confirmed · Survey Link Ready</p>
               <h2 class="font-display text-2xl text-cream-off font-bold">Send this link to your tenant</h2>
             </div>
           </div>
 
           <p class="text-cream-off/55 text-sm leading-relaxed mb-6">
-            Your unique survey has been created. Copy the link below and send it to your prospective tenant.
+            Your unique survey has been created and your payment has been processed.
+            Copy the link below and send it directly to your prospective tenant.
             Once they complete the questionnaire, your <strong class="text-cream-off">Homeresi Trust Score Report</strong>
             will be emailed to you within <strong class="text-cream-off">4 hours</strong>.
           </p>
 
+          <!-- Survey URL copy box -->
           <div class="mb-6">
-            <label class="block text-xs font-medium text-cream-off/50 mb-2 uppercase tracking-wide">Tenant Survey URL</label>
+            <label class="block text-xs font-medium text-cream-off/50 mb-2 uppercase tracking-wide">
+              Tenant Survey URL
+            </label>
             <div class="link-box">
               <input id="surveyLinkInput" type="text" readonly />
               <button class="copy-btn" id="copyBtn" onclick="copyLink()">Copy</button>
@@ -417,10 +511,11 @@
 
           <div class="border-t border-gold-muted/10 my-6"></div>
 
+          <!-- Summary tiles -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="rounded-xl p-4" style="background:rgba(28,42,66,0.6);">
               <p class="text-cream-off/35 text-xs mb-1.5 uppercase tracking-wide">Report Delivered To</p>
-              <p class="text-cream-off text-sm font-medium truncate" style="font-family:'JetBrains Mono',monospace;" id="confirmEmail">—</p>
+              <p class="text-cream-off text-sm font-medium truncate font-mono" id="confirmEmail">—</p>
             </div>
             <div class="rounded-xl p-4" style="background:rgba(28,42,66,0.6);">
               <p class="text-cream-off/35 text-xs mb-1.5 uppercase tracking-wide">Estimated Delivery</p>
@@ -429,15 +524,15 @@
           </div>
         </div>
 
-        <!-- Next steps -->
+        <!-- Next steps card -->
         <div class="card p-6 mb-6">
           <p class="badge text-gold-muted mb-4">Next Steps</p>
           <div class="space-y-4">
             <div class="how-step">
-              <div class="how-num" style="background:rgba(45,106,79,0.15);border-color:rgba(45,106,79,0.35);color:#40916C;font-size:0.8rem;">✓</div>
+              <div class="how-num" style="background:rgba(45,106,79,0.15);border-color:rgba(45,106,79,0.35);color:#40916C;font-size:0.85rem;">✓</div>
               <div>
-                <p class="text-green-light text-sm font-medium">Survey link created</p>
-                <p class="text-cream-off/40 text-xs">Your application is saved securely in our system.</p>
+                <p class="text-green-light text-sm font-medium">Payment confirmed &amp; survey link created</p>
+                <p class="text-cream-off/40 text-xs">Your application is saved securely in Homeresi.</p>
               </div>
             </div>
             <div class="how-step">
@@ -450,8 +545,8 @@
             <div class="how-step">
               <div class="how-num">03</div>
               <div>
-                <p class="text-cream-off text-sm font-medium">Receive your AI Risk Report</p>
-                <p class="text-cream-off/40 text-xs">Once your tenant submits, your Homeresi Trust Score Report arrives by email within 4 hours.</p>
+                <p class="text-cream-off text-sm font-medium">Receive your AI Trust Score Report</p>
+                <p class="text-cream-off/40 text-xs">Once your tenant submits the questionnaire, your Homeresi report arrives by email within 4 hours.</p>
               </div>
             </div>
           </div>
@@ -464,13 +559,29 @@
         </div>
 
       </div>
-      <!-- END CONFIRMATION VIEW -->
+      <!-- END STEP 2 -->
 
+
+      <!-- ── DB error banner ─────────────────────────────────────────────────
+           Only shown if the Firestore write fails AFTER a confirmed payment.
+           The landlord is given a direct support email to resolve it manually.
+      ──────────────────────────────────────────────────────────────────────── -->
+      <div id="dbErrorBanner" class="mt-6 p-5 rounded-xl text-sm leading-relaxed"
+        style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.3);color:#f87171;">
+        <p class="font-semibold mb-1">Your payment was successful, but something went wrong on our end.</p>
+        <p class="text-xs" style="opacity:0.8;">
+          We could not automatically create your survey link. Please contact us at
+          <a href="mailto:homeresicom@gmail.com" class="underline underline-offset-2 text-red-300">homeresicom@gmail.com</a>
+          with your payment confirmation and we will resolve this within the hour.
+        </p>
+      </div>
+
+      <!-- Legal disclaimer -->
       <p class="text-center text-cream-off/25 text-xs mt-10 max-w-md mx-auto leading-relaxed">
         By submitting this form you acknowledge that Homeresi reports are advisory risk assessments only and do not constitute legal advice. Homeresi bears no liability for lease outcomes.
       </p>
 
-      <!-- Legal footer -->
+      <!-- Legal footer links -->
       <div class="flex items-center justify-center gap-5 mt-6 mb-2">
         <button onclick="openLegalModal('privacy')" class="text-cream-off/30 hover:text-gold-muted text-xs transition-colors">Privacy Policy</button>
         <span class="text-cream-off/15 text-xs">·</span>
@@ -482,7 +593,8 @@
     </div>
   </main>
 
-  <!-- ══════════ LEGAL MODALS ══════════ -->
+
+  <!-- ══ LEGAL MODALS ═══════════════════════════════════════════════════════ -->
   <div id="legalOverlay" class="legal-overlay" onclick="closeLegalModal(event)">
     <div class="legal-modal" onclick="event.stopPropagation()">
 
@@ -539,7 +651,6 @@
         </div>
         <div class="legal-body">
           <p class="mb-6">Have a question about your report, a technical issue, or a privacy request? Our team is happy to help.</p>
-
           <a href="mailto:homeresicom@gmail.com" class="contact-card">
             <div class="contact-icon">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
@@ -550,14 +661,15 @@
             </div>
             <svg class="w-4 h-4 text-gold-muted ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
           </a>
-
-          <p class="text-cream-off/30 text-xs mt-6 leading-relaxed">We typically respond within 24 hours on business days. For urgent report-delivery issues, please include your application reference if available.</p>
+          <p class="text-cream-off/30 text-xs mt-6 leading-relaxed">We typically respond within 24 hours on business days. For urgent report-delivery issues, please include your payment confirmation reference.</p>
         </div>
       </div>
 
     </div>
   </div>
 
+
+  <!-- ══ SCRIPT ════════════════════════════════════════════════════════════ -->
   <script>
     // ── Firebase initialisation ────────────────────────────────────────────────
     const firebaseConfig = {
@@ -571,137 +683,119 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ── Generate a cryptographically random 16-char hex ID ────────────────────
-    function generateId() {
-      const arr = new Uint8Array(8);
-      crypto.getRandomValues(arr);
-      return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
+    // ── Required fields for Step 1 validation ────────────────────────────────
+    const REQUIRED = [
+      'landlordName', 'landlordEmail', 'landlordPhone',
+      'tenantEmail', 'propertyType', 'rentalPrice', 'propertyLocation'
+    ];
 
-    // ── Required field IDs ────────────────────────────────────────────────────
-    const REQUIRED = ['landlordName', 'landlordEmail', 'landlordPhone', 'propertyType', 'rentalPrice', 'propertyLocation'];
-
-    // Clear error style on user input
+    // Remove error highlight as the landlord corrects each field
     REQUIRED.forEach(id => {
       document.getElementById(id)?.addEventListener('input', () => {
         document.getElementById(id)?.classList.remove('error');
+        document.getElementById('errorBanner').classList.add('hidden');
       });
     });
 
+    // ── Form validation ────────────────────────────────────────────────────────
     function validateForm() {
       let valid = true;
       REQUIRED.forEach(id => {
         const el = document.getElementById(id);
-        if (!el.value.trim()) {
-          el.classList.add('error');
+        if (!el || !el.value.trim()) {
+          el?.classList.add('error');
           valid = false;
         } else {
           el.classList.remove('error');
         }
       });
-      if (!valid) alert('Please complete all required fields marked with * before continuing.');
+      if (!valid) {
+        document.getElementById('errorBanner').classList.remove('hidden');
+      }
       return valid;
     }
 
-    // ── Button loading state ──────────────────────────────────────────────────
-    function setLoading(on) {
-      const btn   = document.getElementById('submitBtn');
-      const label = document.getElementById('btnLabel');
-      btn.disabled = on;
-      if (on) {
-        document.getElementById('btnIcon').outerHTML = '<span id="btnIcon" class="spinner"></span>';
-        label.textContent = 'Creating link…';
-      } else {
-        document.getElementById('btnIcon').outerHTML =
-          `<svg id="btnIcon" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-          </svg>`;
-        label.textContent = 'Generate Survey Link';
-      }
-    }
-
-    function showError(show) {
-      document.getElementById('errorBanner').classList.toggle('hidden', !show);
-    }
-
-    // ── Build absolute survey.html URL ────────────────────────────────────────
-    function buildSurveyUrl(id) {
-      const base = window.location.href.replace(/\/[^/]*(\?.*)?$/, '/');
-      return `${base}survey.html?id=${id}`;
-    }
-
-    // ── Main submit handler ───────────────────────────────────────────────────
-    async function handleSubmit() {
-      showError(false);
+    // ── Step 1 submit handler ─────────────────────────────────────────────────
+    // Validates the form, then redirects the landlord to the Lemon Squeezy
+    // checkout page with the tenant email embedded as the passthrough parameter.
+    // Lemon Squeezy replaces [passthrough] with this value in the return URL:
+    //   https://www.homeresi.com/homeresi-form.html?status=success&tenant=[passthrough]
+    function handleSubmit() {
       if (!validateForm()) return;
-      setLoading(true);
+
+      const tenantEmail = document.getElementById('tenantEmail').value.trim();
+
+      const checkoutUrl =
+        'https://homeresi.lemonsqueezy.com/checkout/buy/39ad8207-1d11-49a8-ba53-34ad2b492cac' +
+        '?discount=0&passthrough=' + encodeURIComponent(tenantEmail);
+
+      window.location.href = checkoutUrl;
+    }
+
+    // ── Lemon Squeezy return routing ──────────────────────────────────────────
+    // Triggered on every page load. Checks whether Lemon Squeezy has redirected
+    // the landlord back with ?status=success&tenant=<email>.
+    // If so:
+    //   1. Shows the processing overlay immediately for visual feedback.
+    //   2. Writes a new document to the Firestore 'requests' collection.
+    //   3. Captures the auto-generated Firestore Document ID (docRef.id).
+    //   4. Injects the survey URL into the copy-box:
+    //        https://www.homeresi.com/survey.html?id=<docRef.id>
+    //   5. Hides Step 1, reveals Step 2 with a fade-in animation.
+    // On Firestore failure: hides the overlay and shows the DB error banner so
+    //   the landlord can contact support — their payment was already confirmed.
+    document.addEventListener('DOMContentLoaded', async () => {
+      const params      = new URLSearchParams(window.location.search);
+      const status      = params.get('status');
+      const tenantEmail = (params.get('tenant') || '').trim();
+
+      // Only proceed when Lemon Squeezy confirms a successful payment
+      if (status !== 'success' || !tenantEmail) return;
+
+      // Show overlay immediately — Firestore write is about to start
+      const overlay    = document.getElementById('processingOverlay');
+      const overlayMsg = document.getElementById('overlayMsg');
+      overlay.classList.add('active');
 
       try {
-        const applicationId = generateId();
-        const surveyLink    = buildSurveyUrl(applicationId);
+        overlayMsg.textContent = 'Recording your application in Homeresi…';
 
-        const applicationData = {
-          applicationId,
-          landlord: {
-            name:  document.getElementById('landlordName').value.trim(),
-            email: document.getElementById('landlordEmail').value.trim(),
-            phone: document.getElementById('landlordPhone').value.trim(),
-          },
-          property: {
-            type:           document.getElementById('propertyType').value,
-            monthlyRent:    Number(document.getElementById('rentalPrice').value) || null,
-            estimatedValue: Number(document.getElementById('propertyValue').value) || null,
-            location:       document.getElementById('propertyLocation').value.trim(),
-            leaseDuration:  document.getElementById('leaseDuration').value || null,
-          },
-          surveyLink,
-          status:     'awaiting_tenant',   // updated to 'submitted' when tenant completes survey
-          tenantData: null,                // populated by survey.html on submission
-          createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
-        };
+        // Create a new document in the 'requests' collection.
+        // Firebase auto-generates the Document ID — this becomes the survey ID.
+        const docRef = await db.collection('requests').add({
+          tenantEmail,
+          status:        'awaiting_tenant',
+          paymentStatus: 'completed',
+          createdAt:     firebase.firestore.FieldValue.serverTimestamp(),
+        });
 
-        // Use the generated ID as the Firestore document ID for direct lookup
-        await db.collection('applications').doc(applicationId).set(applicationData);
-        console.log('Application created in Firestore with ID:', applicationId);
+        console.log('Firestore document created successfully. ID:', docRef.id);
+        overlayMsg.textContent = 'All done — building your survey link…';
 
-        // Show the confirmation screen
-        document.getElementById('surveyLinkInput').value           = surveyLink;
-        document.getElementById('confirmEmail').textContent        = applicationData.landlord.email;
-        document.getElementById('formView').style.display          = 'none';
-        document.getElementById('confirmation').style.display      = 'block';
+        // Build the canonical tenant survey URL
+        const surveyUrl = 'https://www.homeresi.com/survey.html?id=' + docRef.id;
+
+        // Inject into the copy-box
+        document.getElementById('surveyLinkInput').value = surveyUrl;
+
+        // Populate the "Report Delivered To" tile with the tenant email.
+        // (Landlord email was not passed through the payment URL in this flow;
+        //  you can extend this by adding a landlordEmail passthrough if needed.)
+        document.getElementById('confirmEmail').textContent = tenantEmail;
+
+        // Dismiss overlay → hide Step 1 → reveal Step 2
+        overlay.classList.remove('active');
+        document.getElementById('formView').style.display     = 'none';
+        document.getElementById('confirmation').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
       } catch (err) {
-        console.error('Firestore write failed:', err);
-        setLoading(false);
-        showError(true);
-      }
-    }
-
-    // ── URL-parameter routing: handle redirect from homeresi-success.html ────
-    // When the landlord arrives via ?step=2&id=FIRESTORE_ID (sent by the success
-    // page after a Lemon Squeezy payment), skip the form entirely and show the
-    // confirmation view with the pre-built survey link injected.
-    document.addEventListener('DOMContentLoaded', () => {
-      const params  = new URLSearchParams(window.location.search);
-      const step    = params.get('step');
-      const urlId   = params.get('id');
-
-      if (step === '2' && urlId) {
-        // Build the canonical survey URL using the Firestore document ID
-        const surveyUrl = `https://www.homeresi.com/survey.html?id=${urlId}`;
-
-        // Inject the link into the copy-box input
-        document.getElementById('surveyLinkInput').value = surveyUrl;
-
-        // Hide the form, show the confirmation card
-        document.getElementById('formView').style.display     = 'none';
-        document.getElementById('confirmation').style.display = 'block';
-
-        // Scroll to top so the confirmation card is the first thing visible
+        // The payment succeeded but our Firestore write failed.
+        // Hide the overlay and show the support error banner.
+        console.error('Firestore write failed after payment return:', err);
+        overlay.classList.remove('active');
+        document.getElementById('dbErrorBanner').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-
-        console.log('Step-2 routing: showing confirmation view for ID', urlId);
       }
     });
 
@@ -713,12 +807,13 @@
       document.body.style.overflow = 'hidden';
     }
     function closeLegalModal(e) {
-      // If called from the overlay click, only close when clicking the overlay itself
+      // When called from the overlay's onclick, only close if the overlay
+      // itself was clicked (not a child element inside the modal card).
       if (e && e.target.id !== 'legalOverlay') return;
       document.getElementById('legalOverlay').classList.remove('open');
       document.body.style.overflow = '';
     }
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeLegalModal({ target: { id: 'legalOverlay' } });
     });
 
@@ -729,7 +824,7 @@
       try {
         await navigator.clipboard.writeText(val);
       } catch {
-        // Fallback for browsers without Clipboard API
+        // Fallback for browsers that restrict the Clipboard API
         const tmp = document.createElement('textarea');
         tmp.value = val;
         document.body.appendChild(tmp);
