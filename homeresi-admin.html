@@ -8,55 +8,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <!-- Enhanced Security Gate with Firebase v9 Compat Support -->
-<style id="auth-gate-style">
-  body { display: none !important; }
-</style>
 
-<!-- Load Firebase Compat Libraries to feed your existing Firestore -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<!-- FIX: Added missing Firestore library to resolve the loading loop -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase Compat SDK v9 — most reliable for inline scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-<script>
-  // Global Firebase Configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
-    authDomain: "homeresi-new.firebaseapp.com",
-    projectId: "homeresi-new",
-    storageBucket: "homeresi-new.firebasestorage.app",
-    messagingSenderId: "447512997027",
-    appId: "1:447512997027:web:cbf6bccb9ae28a509f2316"
-  };
-
-  // Initialize Firebase using the Compat mode
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-
-  const auth = firebase.auth();
-  const db = firebase.firestore(); // This resolves the db.collection calls below
-
-  const allowedAdmins = ["muhammetpiri28@gmail.com"];
-
-  auth.onAuthStateChanged((user) => {
-    if (user && user.email) {
-      const userEmailLower = user.email.toLowerCase().trim();
-
-      if (allowedAdmins.includes(userEmailLower)) {
-        // Access verified: Uncover the admin layout
-        const styleElement = document.getElementById('auth-gate-style');
-        if (styleElement) styleElement.remove();
-        return;
-      }
-    }
-
-    // Evict illegal or unauthenticated attempts
-    window.location.href = 'homeresi-login.html';
-  });
- 
-</script>
   <script>
     tailwind.config = {
       theme: {
@@ -199,18 +155,10 @@
           <span class="w-1.5 h-1.5 rounded-full bg-green-light inline-block animate-pulse"></span>
           Live
         </span>
-       <a href="#" onclick="handleTenantScreeningPayment(); return false;" class="bg-gold-muted hover:bg-gold-light text-slate-ink font-semibold px-4 py-2 rounded-lg transition-colors">
-            + New Request
-          </a>
-          <button onclick="(() => {
-            const email = prompt('Please enter the tenant\'s email address to send the screening request:');
-            if (!email) return;
-            const link = 'https://homeresi.lemonsqueezy.com/checkout/buy/39ad8207-1d11-49a8-ba53-34ad2b492cac?discount=0';
-            const success = window.location.origin + '/homeresi-success.html?tenant=' + encodeURIComponent(email);
-            window.location.href = link + '&checkout[redirect_url]' + '=' + encodeURIComponent(success);
-          })()" class="bg-amber-mid hover:bg-gold-light text-slate-ink font-semibold px-4 py-2 rounded-lg transition-colors ml-2">
-            + Test Payment
-          </button>
+        <a href="homeresi-form.html" class="bg-gold-muted hover:bg-gold-light text-slate-ink text-xs font-semibold px-4 py-2 rounded-lg transition-colors inline-block">
+          + New Request
+        </a>
+      </div>
     </header>
 
     <main class="flex-1 p-6">
@@ -315,10 +263,20 @@
 
     </main>
   </div>
-</script>
 
-<script>
- 
+  <script>
+    // ── Firebase initialisation ────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCqshvC9T131s44rD7pGO2LQwa_3Ay68AE",
+      authDomain:        "homeresi-new.firebaseapp.com",
+      projectId:         "homeresi-new",
+      storageBucket:     "homeresi-new.firebasestorage.app",
+      messagingSenderId: "447512997027",
+      appId:             "1:447512997027:web:cbf6bccb9ae28a509f2316"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     // ── State ──────────────────────────────────────────────────────────────────
     let requests     = [];   // flattened, normalised application records
     let activeFilter = 'all';
@@ -370,7 +328,7 @@
     }
 
     // ── Firestore real-time listener ────────────────────────────────────────────
-    db.collection('applications')
+    db.collection('requests')
       .orderBy('createdAt', 'desc')
       .onSnapshot(
         (snapshot) => {
@@ -777,7 +735,7 @@ Status: ${statusLabel(r.status)}`;
     // ── Update status directly in Firestore ─────────────────────────────────────
     async function updateStatus(id, newStatus) {
       try {
-        await db.collection('applications').doc(id).update({ status: newStatus });
+        await db.collection('requests').doc(id).update({ status: newStatus });
         console.log('Status updated in Firestore for', id, '→', newStatus);
         // The onSnapshot listener will automatically re-render with the new data.
         openRow = id;
@@ -803,22 +761,5 @@ Status: ${statusLabel(r.status)}`;
       renderTable();
     }
   </script>
-<script>
-    // This function is completely isolated to prevent any layout or authentication crashes
-    function handleTenantScreeningPayment() {
-      const tenantEmail = prompt("Please enter the tenant's email address to send the screening request:");
-      
-      if (!tenantEmail) {
-        return; // Cancel softly if empty
-      }
-
-      const lemonSqueezyLink = "https://homeresi.lemonsqueezy.com/checkout/buy/39ad8207-1d11-49a8-ba53-34ad2b492cac?discount=0";
-      const successUrl = window.location.origin + /homeresi-success.html?tenant=${encodeURIComponent(tenantEmail)};
-      const finalRedirectUrl = ${lemonSqueezyLink}&checkout[redirect_url]=${encodeURIComponent(successUrl)};
-      
-      window.location.href = finalRedirectUrl;
-    }
-    </script>
-
 </body>
 </html>
